@@ -1,0 +1,214 @@
+title: "Cool Home Design Project"
+driving_question: "How can we build a home that stays cool in summer — without a fan or AC?"
+phases:
+  explore:
+    name: "Phase 1 - Explore"
+    key: "Explore"
+    duration: "~4 hours"
+    summary: >
+      Students learn to navigate Google Maps Street View and explore real homes in hot regions.
+      They observe roof shapes, colors, and materials, identify design patterns, and sketch a
+      “cool home.” This builds curiosity, critical thinking, and introduces climate-responsive design.
+    story_hook:
+      - question: "How can we build a home that stays cool in summer — without a fan or AC?"
+      - prompts:
+          - "Do you remember how hot it was in May before the rains started?"
+          - "Imagine a house in our neighborhood — same sun — but cooler inside without AC or fan. Is that possible?"
+          - "What’s different about that house?"
+          - "Some people are building smarter homes. Today, you’ll become a young eco-architect."
+    activities:
+      - name: "Google Maps Tour"
+        description: "Explore homes in Rajasthan, Kerala, and Dubai using Street View and observe building features."
+        steps:
+          - "Go to google.com/maps"
+          - "Type a location (e.g., 'Rajasthan')"
+          - "Zoom in and enter Street View"
+          - "Observe roof shapes, building materials, and colors"
+          - "Discuss and compare findings"
+      - name: "Sketch Your Own Cool Home"
+        description: "Students draw their own home design using insights from their exploration."
+        steps:
+          - "Use colors and label parts"
+          - "Think about materials and features to keep the home cool"
+          - "Present sketches to peers"
+    tools_materials:
+      - "Internet-connected device"
+      - "Google Maps / Street View"
+      - "Notebook & pencil"
+      - "Colored pencils or crayons"
+    student_output:
+      - "Notes and insights from Street View exploration"
+      - "Sketch and rationale behind a cool home design"
+    potential_questions:
+      - "Can plants help cool a house?"
+      - "Why do some houses have sloping roofs?"
+      - "What materials keep heat out?"
+      - "Is white paint cooler than black?"
+    facilitation_notes:
+      - "Ask who an architect is and why smart homes matter"
+      - "Prompt students with questions on roof types and materials"
+      - "For advanced students: discuss insulation, heat flow"
+    general_guidelines:
+      - "Encourage curiosity and pattern recognition"
+      - "Let students observe freely, ask questions"
+      - "Avoid giving answers, nudge with questions"
+      - "Hold class discussions post-activity"
+      - "Ensure all students sketch their cool home"
+  learn:
+    name: "Phase 2 - Learn"
+    key: "Learn"
+    duration: "~4 hours"
+    summary: >
+      Students analyze real-world house materials and their heat behavior using images and stories.
+      They reflect on what makes houses hot or cool and apply this to their surroundings.
+    story_hook:
+      - "You are a Heat Detective!"
+      - "Your mission is to figure out what materials trap heat and which keep it out."
+    activities:
+      - name: "Mini Investigation Activity"
+        description: "Use a Google Slides deck to observe real homes with various materials."
+        link: "https://docs.google.com/presentation/d/1yoeHCyXG84B4vrF_lbfTUtb0vk5uL0R3hOsmEYRrmV8/edit#slide=id.g35ac90d6ea3_0_685"
+        houses:
+          - "Mud House (Kutch, Gujarat)"
+          - "Terracotta Roof (Kochi, Kerala)"
+          - "Limestone Walls (Jaisalmer, Rajasthan)"
+          - "White Roof (Ahmedabad, Gujarat)"
+          - "Glass House (Mumbai)"
+          - "Cement Walls (Bengaluru)"
+      - name: "Detective Notebook Task"
+        description: "Students draw or write answers to reflection questions on material behavior."
+      - name: "Heat Detective Badge Challenge"
+        description: "Students observe their own homes and list hot vs. cool materials."
+    tools_materials:
+      - "Device to view slides"
+      - "Notebook and pencils"
+      - "Material chart (optional)"
+    student_output:
+      - "Detective notebook with reflections"
+      - "List of hot vs. cool home materials"
+    potential_questions:
+      - "Why does white paint feel cooler?"
+      - "Why is glass hot but mud cool?"
+      - "Why does cement stay hot longer?"
+    facilitation_notes:
+      - "Use guiding prompts for comparison and preference"
+      - "Discuss color, heat absorption, insulation"
+      - "Link back to climate and region"
+    general_guidelines:
+      - "Don’t give away answers — promote inquiry"
+      - "Connect learning to students' own homes"
+      - "Celebrate curiosity with a 'Heat Detective' badge"
+  design:
+    name: "Phase 3 - Design"
+    key: "Design"
+    duration: "4–6 hours"
+    summary: >
+      Students apply learning by designing their own Cool Home in a Roblox simulation.
+      Encourages creative play and scientific reasoning through building and reflecting on their digital house.
+    story_hook:
+      - "You are an eco-architect today!"
+      - "Build a cool home using smart design."
+    activities:
+      - name: "Roblox Mini Home Builder"
+        description: >
+          In Roblox, students build a house using elements like shade, color, ventilation.
+          Each group has different climate/location/person constraints.
+      - features_to_consider:
+          - "Heat resistant materials"
+          - "Windows with cross-ventilation"
+          - "Shading devices"
+          - "Sloped vs flat roofs"
+          - "Light-colored walls"
+          - "Trees, plants, water features"
+    tools_materials:
+      - "Device with Roblox access"
+      - "Roblox simulation link"
+      - "Notebook for reflections (optional)"
+    student_output:
+      - "3D digital house in Roblox"
+      - "Screenshots"
+      - "Design notes and rationale"
+    potential_questions:
+      - "How do I add trees?"
+      - "Can I build two floors?"
+      - "Why doesn’t this roof cool the house?"
+    facilitation_notes:
+      - "Let students explore first"
+      - "Ask reflective design questions"
+      - "Support based on given constraints"
+    general_guidelines:
+      - "Focus on thoughtful design, not perfection"
+      - "Encourage connection to real-life environments"
+      - "Celebrate ideas and effort"
+  exhibit:
+    name: "Phase 4 - Exhibit"
+    key: "Exhibit"
+    duration: "15 minutes per group"
+    summary: >
+      Students present their Cool Home designs and explain their thinking. A platform to celebrate ideas,
+      boost communication, and deepen understanding through peer learning.
+    story_hook:
+      - "Time to share your amazing designs!"
+      - "Let’s showcase ideas like real architects!"
+    activities:
+      - name: "Cool Home Exhibition"
+        description: >
+          Students present sketches, Roblox models, and design rationale.
+          Optional gallery walk with peer feedback using stickers or smileys.
+    tools_materials:
+      - "Device for presentations"
+      - "Stickers for feedback (optional)"
+    student_output:
+      - "Presentation (3–4 mins)"
+      - "Gallery of designs"
+      - "Peer appreciation and discussion"
+    potential_questions:
+      - "What if my house is very simple?"
+      - "Can I present with a friend?"
+      - "Can I add more now?"
+    facilitation_notes:
+      - "Make it a celebration"
+      - "Ask open-ended follow-ups"
+      - "Allow shy students to work in pairs"
+    general_guidelines:
+      - "Value every idea and effort"
+      - "Foster peer-to-peer questions and compliments"
+      - "Record the session for memories/documentation"
+  reflect:
+    name: "Phase 5 - Reflect"
+    key: "Reflect"
+    duration: "30–90 minutes"
+    summary: >
+      Students reflect on their journey, insights, and evolving understanding of heat, materials, and design.
+      Encourages metacognition and reinforces key takeaways.
+    story_hook:
+      - "Look back and think forward!"
+      - "What did you learn that surprised you?"
+    activities:
+      - name: "Reflection Prompts"
+        type: "Written or Oral"
+        prompts:
+          - "I used to think… now I think…"
+          - "The coolest thing I learned was…"
+          - "If I had to design a school that stays cool, I would…"
+          - "Something I want to explore more about is…"
+      - name: "Optional Circle Sharing"
+        description: "Each student shares one takeaway out loud"
+    tools_materials:
+      - "Notebook"
+      - "Poster paper, art supplies (optional)"
+      - "Self-evaluation form (optional)"
+    student_output:
+      - "Short reflections"
+      - "Quotes for a class reflection poster"
+      - "Self-evaluation (optional)"
+    potential_questions:
+      - "Do I have to write full sentences?"
+      - "Can I draw instead?"
+    facilitation_notes:
+      - "Give students choice in format"
+      - "Celebrate every kind of response"
+      - "Use quotes to make a group poster"
+    general_guidelines:
+      - "Help students internalize and articulate learning"
+      - "Celebrate thoughtfulness over correctness"
