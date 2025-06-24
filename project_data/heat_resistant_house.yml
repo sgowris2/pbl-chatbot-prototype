@@ -25,14 +25,21 @@ phases:
           - "Zoom in and enter Street View"
           - "Observe roof shapes, building materials, and colors"
           - "Discuss and compare findings"
+        simplifications:
+          - "If Google Maps is not available for any reason, show students pictures of houses and ask them to identify features and materials, and reasons for them."
+          - "If students are finding it hard to find places on Google Maps, give them direct links to certain locations that they can explore."
+          - "If students cannot identify different materials, give them a list of common materials that they can search for online to see how they may look in a picture."
+          -
+        extensions:
+          - ""
       - name: "Sketch Your Own Cool Home"
         description: "Students draw their own home design using insights from their exploration."
         steps:
-          - "Use colors and label parts"
+          - "Use colors and label parts of the house, materials for each part, and unique features"
           - "Think about materials and features to keep the home cool"
-          - "Present sketches to peers"
+          - "Present sketches to peers and ask for their feedback"
     tools_materials:
-      - "Internet-connected device"
+      - "Internet-connected computer or tablet device"
       - "Google Maps / Street View"
       - "Notebook & pencil"
       - "Colored pencils or crayons"
