@@ -1,10 +1,10 @@
+import base64
 import json
-import time
 
 import streamlit as st
-from streamlit.components.v1 import html
 import yaml
 from openai import OpenAI
+from streamlit.components.v1 import html
 from streamlit_float import float_css_helper, float_parent, float_init
 
 from prompts import system_prompt, validity_prompt, category_prompt, context_template
@@ -39,11 +39,31 @@ def get_dropdown_mappings():
         },
     }
 
+def display_messages(latest_only=False):
 
-def display_chat_history():
-    for idx, message in enumerate(st.session_state.messages):
+    if len(st.session_state.messages) < 2:
+
+        def get_base64_image(image_path):
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        image_data = get_base64_image("static/ai_robot.jpg")
+
+        st.markdown(f"""
+            <div style='text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;'>
+                <img src="data:image/png;base64,{image_data}" width="300" style="border-radius: 15px; border: 0px solid gray; max-width: 100%; height: auto;" />
+                <h3 style='color: #1f4760;'>Hi! I'm Akshu.</h3>
+                <p style='font-size: 18px; color: #555;'>I'm here to help you with your project!</p>
+            </div>
+        """, unsafe_allow_html=True)
+        return
+
+    avatars = {"assistant": "💡", "user": "❓", "error": "⚠️"}
+
+    messages = [st.session_state.messages[-1]] if latest_only else st.session_state.messages
+
+    for idx, message in enumerate(messages):
         if message.get("error", False):  # Check if the message is an error
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar=avatars["error"]):
                 st.markdown(
                     f"""
                     <div style="background-color: #ffe6e6; padding: 10px; border-radius: 5px; border: 1px solid #ffcccc;">
@@ -55,43 +75,34 @@ def display_chat_history():
                     unsafe_allow_html=True,
                 )
         elif message["role"] in ["user", "assistant"]:
-            with st.chat_message(message["role"]):
+            with st.chat_message(message["role"], avatar=avatars[message["role"]]):
                 st.markdown(message["content"])
 
-        scroll_to_bottom(anchor_id=f"scroll-anchor-{idx}")
+        if not latest_only:
+            scroll_to_bottom(anchor_id=f"scroll-anchor-{idx}")
+        else:
+            scroll_to_bottom(anchor_id=f'scroll-anchor-{len(st.session_state.messages) - 1}')
 
+def display_chat_history():
+    display_messages()
 
 def display_latest_message():
-    message = st.session_state.messages[-1] if st.session_state.messages else None
-    if message.get("error", False):  # Check if the message is an error
-        with st.chat_message("assistant"):
-            st.markdown(
-                f"""
-                <div style="background-color: #ffe6e6; padding: 10px; border-radius: 5px; border: 1px solid #ffcccc;">
-                    <p style="color: #cc0000; font-size: 16px; margin: 0;">
-                        {message["content"]}
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-    elif message["role"] in ["user", "assistant"]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    scroll_to_bottom(anchor_id=f'scroll-anchor-{len(st.session_state.messages) - 1}')
+    display_messages(latest_only=True)
 
 
-def check_question_validity(client, prompt):
+def check_question_validity(client, prompt, past_messages):
     response = client.chat.completions.create(
         model=st.session_state["openai_model"],
         messages=[
             {"role": "system", "content": validity_prompt},
             {"role": "user", "content": prompt},
+            {"role": "system", "content": "You have access to the following messages for context: " + json.dumps(past_messages) if past_messages else ""},
         ],
     )
     result = json.loads(response.choices[0].message.content)
-    return result["is_valid"], result["language"], result["message"]
+    if DEBUG:
+        print(result)
+    return result['prompt'], result["is_valid"], result["language"], result["message"], result["is_default"]
 
 
 def get_question_category(client, prompt):
@@ -102,6 +113,8 @@ def get_question_category(client, prompt):
             {"role": "user", "content": prompt},
         ],
     )
+    if DEBUG:
+        print(response.choices[0].message.content)
     return json.loads(response.choices[0].message.content)["category"]
 
 
@@ -138,6 +151,8 @@ def generate_final_response(client, prompt, grade, project_name, project_key, pr
         ],
         stream=False,
     )
+    if DEBUG:
+        print(response.choices[0].message.content)
     return response.choices[0].message.content.strip()
 
 
@@ -160,19 +175,94 @@ def scroll_to_bottom(anchor_id="scroll-anchor"):
     )
 
 
-def main():
+def render_project_guide(project_key, phase=None):
+    import streamlit as st
+    import yaml
+
+    project_filename = f"./project_data/{project_key}.yml"
+    with open(project_filename, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    phases = data.get("phases", {})
+    if phase is not None:
+        phases = {phase.lower(): phases.get(phase.lower(), {})}
+
+    st.markdown(f"# 🏗️ {data.get('title', 'Project Title')}")
+    st.markdown(f"### ❓ Driving Question\n> {data.get('driving_question', '')}")
+
+    # --- Create a tab for each phase ---
+    tab_labels = [details.get("name", key.title()) for key, details in phases.items()]
+    tabs = st.tabs(tab_labels)
+
+    # --- Render each tab dynamically ---
+    for (key, details), tab in zip(phases.items(), tabs):
+        with tab:
+            st.markdown(f"### ⏱️ Duration: `{details.get('duration', 'N/A')}`")
+
+            if summary := details.get("summary"):
+                with st.expander("📝 Summary", expanded=True):
+                    st.markdown(f"<div style='font-size: 1.1em; line-height: 1.6;'>{summary}</div>",
+                                unsafe_allow_html=True)
+
+            if hook := details.get("story_hook"):
+                with st.expander("🎣 Story Hook"):
+                    if isinstance(hook, list):
+                        for item in hook:
+                            if isinstance(item, dict):
+                                for k, v in item.items():
+                                    st.markdown(f"**{k.capitalize()}:** {v}")
+                            else:
+                                st.markdown(f"- {item}")
+
+            if activities := details.get("activities"):
+                with st.expander("🎯 Activities"):
+                    for act in activities:
+                        st.markdown(f"#### 🔹 {act.get('name')}")
+                        st.markdown(f"{act.get('description', '')}")
+                        if steps := act.get("steps"):
+                            st.markdown("**👣 Steps:**")
+                            for step in steps:
+                                st.markdown(f"- {step}")
+                        if simplifications := act.get("simplifications"):
+                            st.markdown("**🧩 Simplifications:**")
+                            for s in simplifications:
+                                st.markdown(f"- {s}")
+                        if extensions := act.get("extensions"):
+                            if extensions:
+                                st.markdown("**🚀 Extensions:**")
+                                for e in extensions:
+                                    st.markdown(f"- {e}")
+                        st.markdown("---")
+
+            section_info = [
+                ("🧰 Tools & Materials", "tools_materials"),
+                ("🎨 Student Outputs", "student_output"),
+                ("💬 Potential Questions", "potential_questions"),
+                ("🧑‍🏫 Facilitation Notes", "facilitation_notes"),
+                ("📋 General Guidelines", "general_guidelines"),
+            ]
+
+            for section_title, field_key in section_info:
+                items = details.get(field_key)
+                if items:
+                    with st.expander(section_title):
+                        for item in items:
+                            st.markdown(f"- {item}")
+
+
+def main(debug=False):
+
+
     float_init(theme=True, include_unstable_primary=False)
     st.set_page_config(layout="wide")
     initialize_session_state()
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
     # Layout columns
-    col1, col2 = st.columns([1, 1], gap="large")
+    col1, col2 = st.columns([2, 1], gap="large")
 
     with col1:
         with st.container(border=False):
-            st.title("Saksham Projects Saathi")
-            # st.subheader("Project Guide and AI Assistant")
+            st.title("SakshamProjects Guide Resources")
             dropdown_mappings = get_dropdown_mappings()
             subcol_1, subcol_2, subcol_3 = st.columns([1, 1, 1], gap="small")
             with subcol_1:
@@ -182,34 +272,31 @@ def main():
                 project_name = st.selectbox("Select Project", project_options)
             with subcol_3:
                 project_key = dropdown_mappings[grade][project_name]["key"]
-                project_phase = st.selectbox("Select Project Phase", ["Explore", "Learn", "Design", "Exhibit", "Reflect"])
-            st.button("Apply", key="apply_button")
-            st.markdown("---")
+                project_phase = st.selectbox("Select Project Phase",
+                                             ["Explore", "Learn", "Design", "Exhibit", "Reflect"])
 
             with st.container(border=False):
                 custom_css = float_css_helper(
-                    height="50%",  # Set a fixed height
-                    width="45%",
+                    height="60%",  # Set a fixed height
+                    width="60%",
                     overflow_y="auto",  # Enable vertical scrolling
                     padding="3rem",
-                    border="1px solid #ccc",
-                    background="#f9f9f9",
+                    border="0.5px solid #ccc",
                 )
                 float_parent(css=custom_css)
-                for i in range(0, 100):
-                    st.markdown(i)
+                # if button_pressed:
+                render_project_guide(project_key, phase=project_phase)
 
     with col2:
-
         with st.container():
             if not grade or not project_name or not project_phase:
                 st.error("Please select a grade, project, and project phase to start the chat.")
                 return
             st.session_state.messages.append({"role": "system", "content": system_prompt})
-            prompt = st.chat_input("Hi! How can I help you?", key='chat_input')
+            prompt = st.chat_input("Ask me anything about your project!", key='chat_input')
             button_css = float_css_helper(bottom="2rem",
                                           height="10%",
-                                          width="45%",
+                                          width="30%",
                                           padding="2rem 0rem",
                                           overflow_y="auto",
                                           transition=0)
@@ -218,11 +305,11 @@ def main():
         with st.container(border=False):
             custom_css = float_css_helper(
                 height="70%",  # Set a fixed height
-                width="45%",
+                width="30%",
                 overflow_y="auto",  # Enable vertical scrolling
                 padding="1rem",
-                border="1px solid #ccc",
-                background="#f9f9f9",
+                border="0.5px solid #ccc",
+                background="#ffffff",
             )
             float_parent(css=custom_css)
 
@@ -232,40 +319,44 @@ def main():
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 display_latest_message()
 
-                is_valid, language, message = check_question_validity(client, prompt)
+                rewritten_prompt, is_valid, language, message, is_default = check_question_validity(client, prompt, st.session_state.messages[:-5])
                 if not is_valid:
                     st.session_state.messages.append({"role": "assistant", "error": True, "content": message})
                     display_latest_message()
                     st.stop()
                 else:
-                    category_response = get_question_category(client, prompt)
-                    if 'unrelated' in category_response.lower():
-                        response = "The question does not seem to be related to the project. Please ask a relevant question or contact the online coach."
-                        st.session_state.messages.append({"role": "assistant", "error": True, "content": response})
+                    if is_default:
+                        st.session_state.messages.append({"role": "assistant", "content": message})
                         display_latest_message()
                         st.stop()
-                    elif 'unknown' in category_response.lower():
-                        response = "I'm unable to determine the answer to your question. Please rephrase."
-                        st.session_state.messages.append({"role": "assistant", "error": True, "content": response})
+                    else:
+                        category_response = get_question_category(client, rewritten_prompt)
+                        if 'unrelated' in category_response.lower():
+                            response = "The question does not seem to be related to the project. Please ask a relevant question or contact the online coach."
+                            st.session_state.messages.append({"role": "assistant", "error": True, "content": response})
+                            display_latest_message()
+                            st.stop()
+                        elif 'unknown' in category_response.lower():
+                            response = "I'm unable to determine the answer to your question. Please rephrase."
+                            st.session_state.messages.append({"role": "assistant", "error": True, "content": response})
+                            display_latest_message()
+                            st.stop()
+                        elif 'other' in category_response.lower():
+                            st.warning("I'm not too sure of my answer to this question. Here’s my best attempt...")
+
+                        response = generate_final_response(
+                            client=client,
+                            prompt=rewritten_prompt,
+                            grade=grade,
+                            project_name=project_name,
+                            project_key=project_key,
+                            project_phase=project_phase,
+                            language=language,
+                            question_category=category_response
+                        )
+                        st.session_state.messages.append({"role": "assistant", "content": response})
                         display_latest_message()
-                        st.stop()
 
-                    elif 'other' in category_response.lower():
-                        st.warning("I'm not too sure of my answer to this question. Here’s my best attempt...")
-
-                    response = generate_final_response(
-                        client=client,
-                        prompt=prompt,
-                        grade=grade,
-                        project_name=project_name,
-                        project_key=project_key,
-                        project_phase=project_phase,
-                        language=language,
-                        question_category=category_response
-                    )
-                    # time.sleep(60)  # Simulate processing time
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-                    display_latest_message()
 
 st.markdown(
     """
@@ -287,6 +378,5 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+DEBUG = True
 main()
-
-
