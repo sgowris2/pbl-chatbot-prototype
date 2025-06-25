@@ -246,6 +246,7 @@ def main(debug=False):
 
     float_init(theme=True, include_unstable_primary=False)
     st.set_page_config(layout="wide")
+    st.set_page_config(page_title="SakshamProjects | Project Guide", page_icon=":book:", initial_sidebar_state="expanded")
     initialize_session_state()
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -254,7 +255,7 @@ def main(debug=False):
 
     with col1:
         with st.container(border=False):
-            st.title("SakshamProjects Guide Resources")
+            st.title("SakshamProjects - Project Guide")
             dropdown_mappings = get_dropdown_mappings()
             subcol_1, subcol_2, subcol_3 = st.columns([1, 1, 1], gap="small")
             with subcol_1:
