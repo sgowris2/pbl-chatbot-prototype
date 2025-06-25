@@ -19,6 +19,49 @@ phases:
     activities:
       - name: "Google Maps Tour"
         description: "Explore homes in Rajasthan, Kerala, and Dubai using Street View and observe building features."
+        commentary: >
+          "In this 'Explore' phase, students will lay the foundation for understanding how different building choices affect house temperature.
+          Our main objectives are clear. We want students to:
+          First, observe diverse house designs from around the world.
+          Second, identify differences and patterns across houses in different regions.
+          The 'Google Maps Tour' is a fantastic way to bring the world into our classroom! Here are the online steps for students, and for you, as teachers, to guide them. We will explain these 4 steps through a live demonstration on Google Maps."
+          "So, how do we do this?
+          First, open Google Maps on your device.
+          Next, in the search bar, type in a location. For this activity, we want to explore homes in three very different places to see diverse building styles. You can refer to a list of locations in the Explore teacher guide document if you like or pick your own!
+          Let's start with Dubai. We'll type 'Dubai' into the search.
+          Once Dubai loads, zoom in a bit. You can zoom in by pressing the + key on your keyboard and zoom out by pressing the - key. Alternatively, you can also use your mouse pad for it.
+          Now, you'll see a small yellow figure, the 'Pegman,' down in the corner.
+          Drag and drop the Pegman onto any blue line you see on the map. These blue lines indicate areas where Street View is available. This lets us go 'inside' the map and see the houses up close, almost like we're walking down the street!
+          If students drop the Pegman in an area where there are no houses, ask them to enter Dubai again in the search bar and select another location within the city.
+          Once you're in Street View, encourage students to move around. Use the right and left keys on your keypad to move around the screen and reach the house. They can also click on the arrows on the ground to move closer to the house or use their mouse.
+          The key here is observation! Ask them to observe and note down in their notebook:
+          * What materials are primarily used for the walls and roofs?
+          * What do the windows look like? Are they large, small?
+          * What's the overall shape of the houses?
+          * And what about the surrounding environment – is there a lot of vegetation, or shade?
+          If students ask you questions that you do not have answers to, use Saksham Saathi and get answers instantaneously.
+          Once students have spent enough time exploring different houses in Dubai, transition to the next location, e.g., Kerala.
+          "Alright, let's try our second location. Go back to the map view, and this time, let's type in 'Kerala' – specifically, let's look at a village like 'Kumbalangi' in Kerala to see some traditional houses there."
+          "See the difference already? Observe the roof types here, the materials used for the walls, and how the houses might be designed to handle the humid climate of Kerala. Compare them to what you saw in Dubai."
+          (Finally, transition to Rajasthan).
+          "Now, a quick word on potential challenges, because we know things don't always go perfectly!
+          No Internet Connection: If you don't have an internet connection, Google Maps simply won't load. In that scenario, you have a couple of options:
+          Option 1: You can show pre-downloaded images or screenshots of diverse house designs from Google Maps on your phone or device. This still allows for discussion and observation.
+          Option 2: If consistent internet access is an issue, you may choose to skip this specific Google Maps activity and move directly to the related activity in the 'Learn' phase, which might use physical materials or other observation methods.
+          Students are confused about navigation: If students struggle with Google Maps, don't worry! Just remind them of these simple steps: type in the location, then look for the yellow Pegman, drag him onto a blue line to enter Street View, and then use the arrows or drag their finger to move around and explore. Guiding them through the first location usually helps them get the hang of it.
+          Check these 5 things to check if the activity has been completed successfully.
+            * Learn how to use Google Maps street view
+            * Observe how different houses look in different places
+            * Identify difference in materials, shapes, colours
+            * Understand impact of different materials
+            * Develop empathy for people suffering due to climate change
+          Here is an example of what a student’s notes might contain after the explore phase:
+            * What materials are primarily used for the walls and roofs?
+            * What do the windows look like? Are they large, small?
+            * What's the overall shape of the houses?
+            * And what about the surrounding environment – is there a lot of vegetation, or shade?
+          Closing remarks: The main goal here is to spark their curiosity and encourage them to notice details. Remember: during this 'Explore' phase, it's about observation and asking questions, not about finding the 'right' answers. Let them explore, let them be curious!"
+
         steps:
           - "Go to google.com/maps"
           - "Type a location (e.g., 'Rajasthan')"

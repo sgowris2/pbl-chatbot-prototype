@@ -39,6 +39,7 @@ def get_dropdown_mappings():
         },
     }
 
+
 def display_messages(latest_only=False):
 
     if len(st.session_state.messages) < 2:
@@ -83,11 +84,14 @@ def display_messages(latest_only=False):
         else:
             scroll_to_bottom(anchor_id=f'scroll-anchor-{len(st.session_state.messages) - 1}')
 
+
 def display_chat_history():
     display_messages()
 
+
 def display_latest_message():
     display_messages(latest_only=True)
+
 
 def check_question_validity(client, prompt, context, past_messages):
     response = client.chat.completions.create(
@@ -288,6 +292,7 @@ def main(debug=False):
                 phase_instructions=phase_instructions,
                 supplemental_resources='No supplemental resources available.'  # TODO: Placeholder
             )
+            print(context_prompt)
 
             with st.container(border=False):
                 custom_css = float_css_helper(
