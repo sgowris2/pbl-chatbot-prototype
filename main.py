@@ -7,7 +7,7 @@ from openai import OpenAI
 from streamlit.components.v1 import html
 from streamlit_float import float_css_helper, float_parent, float_init
 
-from prompts import system_prompt, validity_prompt, category_prompt, context_template
+from prompts import system_prompt, validity_prompt, category_prompt, context_template, final_prompt_template
 from utils import ProjectDataException
 
 
@@ -89,14 +89,15 @@ def display_chat_history():
 def display_latest_message():
     display_messages(latest_only=True)
 
-
-def check_question_validity(client, prompt, past_messages):
+def check_question_validity(client, prompt, context, past_messages):
     response = client.chat.completions.create(
         model=st.session_state["openai_model"],
         messages=[
             {"role": "system", "content": validity_prompt},
-            {"role": "user", "content": prompt},
-            {"role": "system", "content": "You have access to the following messages for context: " + json.dumps(past_messages) if past_messages else ""},
+            {"role": "system", "content": context},
+            {"role": "system", "content": "You have access to the following past messages for context: " + json.dumps(
+                past_messages) if past_messages else ""},
+            {"role": "user", "content": prompt}
         ],
     )
     result = json.loads(response.choices[0].message.content)
@@ -105,11 +106,12 @@ def check_question_validity(client, prompt, past_messages):
     return result['prompt'], result["is_valid"], result["language"], result["message"], result["is_default"]
 
 
-def get_question_category(client, prompt):
+def get_question_category(client, prompt, context):
     response = client.chat.completions.create(
         model=st.session_state["openai_model"],
         messages=[
             {"role": "system", "content": category_prompt},
+            {"role": "system", "content": context},
             {"role": "user", "content": prompt},
         ],
     )
@@ -119,19 +121,9 @@ def get_question_category(client, prompt):
 
 
 def generate_final_response(client, prompt, grade, project_name, project_key, project_phase, language,
-                            question_category):
-    project_filename = f"./project_data/{project_key}.yml"
-    try:
-        with open(project_filename, "r", encoding="utf-8") as file:
-            project_data = yaml.safe_load(file)
-            project_driving_question = project_data.get("driving_question", "No driving question found.")
-            phase_overview = project_data.get("phases", {}).get(project_phase.lower(), {}).get("summary",
-                                                                                               "No overview found.")
-            phase_instructions = project_data.get("phases", {}).get(project_phase.lower(), {})
-    except Exception as e:
-        raise ProjectDataException(f"Error loading project data: {e}")
+                            question_category, project_driving_question, phase_overview, phase_instructions):
 
-    context = context_template.format(
+    context_prompt = final_prompt_template.format(
         grade=grade,
         project_name=project_name,
         project_phase=project_phase,
@@ -146,7 +138,7 @@ def generate_final_response(client, prompt, grade, project_name, project_key, pr
     response = client.chat.completions.create(
         model=st.session_state["openai_model"],
         messages=[
-            {"role": "system", "content": context},
+            {"role": "system", "content": context_prompt},
             {"role": "user", "content": prompt},
         ],
         stream=False,
@@ -275,6 +267,27 @@ def main(debug=False):
                 project_phase = st.selectbox("Select Project Phase",
                                              ["Explore", "Learn", "Design", "Exhibit", "Reflect"])
 
+            project_filename = f"./project_data/{project_key}.yml"
+            try:
+                with open(project_filename, "r", encoding="utf-8") as file:
+                    project_data = yaml.safe_load(file)
+                    project_driving_question = project_data.get("driving_question", "No driving question found.")
+                    phase_overview = project_data.get("phases", {}).get(project_phase.lower(), {}).get("summary",
+                                                                                                       "No overview found.")
+                    phase_instructions = project_data.get("phases", {}).get(project_phase.lower(), {})
+            except Exception as e:
+                raise ProjectDataException(f"Error loading project data: {e}")
+
+            context_prompt = context_template.format(
+                grade=grade,
+                project_name=project_name,
+                project_phase=project_phase,
+                project_driving_question=project_driving_question,
+                phase_overview=phase_overview,
+                phase_instructions=phase_instructions,
+                supplemental_resources='No supplemental resources available.'  # TODO: Placeholder
+            )
+
             with st.container(border=False):
                 custom_css = float_css_helper(
                     height="60%",  # Set a fixed height
@@ -287,7 +300,7 @@ def main(debug=False):
                 # if button_pressed:
                 render_project_guide(project_key, phase=project_phase)
 
-    with col2:
+    with (col2):
         with st.container():
             if not grade or not project_name or not project_phase:
                 st.error("Please select a grade, project, and project phase to start the chat.")
@@ -319,7 +332,8 @@ def main(debug=False):
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 display_latest_message()
 
-                rewritten_prompt, is_valid, language, message, is_default = check_question_validity(client, prompt, st.session_state.messages[:-5])
+                rewritten_prompt, is_valid, language, message, is_default = \
+                    check_question_validity(client, prompt, context_prompt, st.session_state.messages[-10:])
                 if not is_valid:
                     st.session_state.messages.append({"role": "assistant", "error": True, "content": message})
                     display_latest_message()
@@ -330,7 +344,7 @@ def main(debug=False):
                         display_latest_message()
                         st.stop()
                     else:
-                        category_response = get_question_category(client, rewritten_prompt)
+                        category_response = get_question_category(client, rewritten_prompt, context_prompt)
                         if 'unrelated' in category_response.lower():
                             response = "The question does not seem to be related to the project. Please ask a relevant question or contact the online coach."
                             st.session_state.messages.append({"role": "assistant", "error": True, "content": response})
@@ -352,7 +366,10 @@ def main(debug=False):
                             project_key=project_key,
                             project_phase=project_phase,
                             language=language,
-                            question_category=category_response
+                            question_category=category_response,
+                            project_driving_question=project_driving_question,
+                            phase_overview=phase_overview,
+                            phase_instructions=phase_instructions
                         )
                         st.session_state.messages.append({"role": "assistant", "content": response})
                         display_latest_message()
