@@ -141,6 +141,7 @@ def generate_final_response(client, prompt, grade, project_name, project_key, pr
 
     response = client.chat.completions.create(
         model=st.session_state["openai_model"],
+        temperature=0.1,
         messages=[
             {"role": "system", "content": context_prompt},
             {"role": "user", "content": prompt},
