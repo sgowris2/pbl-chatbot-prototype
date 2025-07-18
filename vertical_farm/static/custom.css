@@ -6,11 +6,7 @@
     width: 100%;
     margin: 0em 0;
 }
-div.stButton > button,
-div.stButton > button:active,
-div.stButton > button:focus {
-    color: white !important;
-}
+
 .st-key-simulate_next_month > div > button, .st-key-simulate_complete > div > button {
     height: 50px;
     padding: 0 1em;
@@ -29,10 +25,16 @@ div.stButton > button:focus {
     background-color: #388e3c;
     color: white;
 }
-.st-key-simulate_next_month > div > button:active, .st-key-simulate_complete > div > button:active {
-    background-color: #388e3c;
-    color: white;
+.st-key-simulate_next_month > div > button:active, .st-key-simulate_complete > div > button:active,
+ .st-key-simulate_next_month > div > button:focus, .st-key-simulate_complete > div > button:focus {
+    color: white !important;
 }
+.st-key-simulate_next_month > div > button:disabled, .st-key-simulate_complete > div > button:disabled {
+    background-color: #9e9e9e;
+    color: white;
+    cursor: not-allowed;
+}
+
 .st-key-factsheet_button > div > button {
     height: 50px;
     padding: 0 1em;
@@ -47,9 +49,14 @@ div.stButton > button:focus {
     margin: 1em auto;
     display: block;
 }
-.st-key-factsheet_button > div > button:hover {
+.st-key-factsheet_button > div > button:hover,   {
     background-color: #506185;
     color: white;
+}
+
+.st-key-factsheet_button > div > button:active,
+.st-key-factsheet_button > div > button:focus  {
+    color: white !important;
 }
 /* Make Streamlit expander label font larger */
 .st-emotion-cache-ana9sc p {

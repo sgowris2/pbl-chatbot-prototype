@@ -15,6 +15,7 @@ INPUT_LEVELS = {
     "H": [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
 }
 
+env_inputs = {"T": 10, "H": 0.0}
 level_inputs = {x: {k: v[0] for k, v in INPUT_LEVELS.items()} for x in LEVELS}
 
 
