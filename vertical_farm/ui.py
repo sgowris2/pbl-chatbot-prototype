@@ -5,12 +5,11 @@ import uuid
 import pandas as pd
 import streamlit as st
 
-from vertical_farm.ui_callbacks import _update_monthly_changes, _disable_simulate, _check_justifications
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from vertical_farm.data import PLANTS
 from vertical_farm.simulator import simulate_month, STARTING_BUDGET, PRICES, LEVELS, LEVEL_AREA, INPUT_LEVELS, level_inputs, env_inputs
+from vertical_farm.ui_callbacks import _update_monthly_changes, _disable_simulate, _check_justifications
 
 
 def initialize_session_state():
