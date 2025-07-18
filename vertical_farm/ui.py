@@ -5,6 +5,8 @@ import uuid
 import pandas as pd
 import streamlit as st
 
+from vertical_farm.ui_callbacks import _update_monthly_changes, _disable_simulate, _check_justifications
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from vertical_farm.data import PLANTS
@@ -38,7 +40,8 @@ def initialize_session_state():
         st.session_state._inputs_expanded = {l: False for l in LEVELS}
         st.session_state._plant_seeds_expanded = {l: False for l in LEVELS}
 
-def render_sidebar():
+
+def sidebar():
     st.sidebar.header("Info Panel")
     st.sidebar.markdown("---")
     st.sidebar.markdown(f"👤 **User:** `{st.session_state.user_id[-5:]}`")
@@ -46,17 +49,17 @@ def render_sidebar():
     st.sidebar.markdown(f"💰 **Cash:** ₹{st.session_state.budget:.2f}")
     st.sidebar.markdown("###")
     with st.sidebar:
-        render_performance()
+        performance_panel()
     with st.sidebar:
         with st.expander("₹ Market Prices"):
             st.table(pd.DataFrame.from_dict(st.session_state.market_prices, orient="index", columns=["₹/kg"]))
 
     if st.sidebar.button('ⓘ Factsheet', key="factsheet_button"):
-        render_factsheet()
+        fact_sheet()
 
 
 @st.dialog("ⓘ Factsheet", width="large")
-def render_factsheet():
+def fact_sheet():
     data = [
         ["Lettuce", 1, "18–24", "50–70", 20, 12, 0.17, "<12°C slows growth; >30°C causes tip‑burn"],
         ["Spinach", 1, "16–22", "50–70", 20, 17, 0.25, "Long-day plant; excess light may bolt"],
@@ -80,7 +83,7 @@ def render_factsheet():
     st.table(df)
 
 
-def render_performance(expanded=True):
+def performance_panel(expanded=True):
     with st.expander("📊 Farm Performance", expanded=expanded):
         total_revenue = sum(
             sum(log["revenue"] for log in month_log) for month_log in st.session_state.monthly_logs.values()
@@ -95,7 +98,7 @@ def render_performance(expanded=True):
     st.markdown("")
 
 
-def render_monthly_summary(expanded=True):
+def this_month_results(expanded=True):
     this_month = st.session_state.month
     with st.expander("📈 This Month's Results", expanded=expanded):
         if this_month > 0:
@@ -116,36 +119,10 @@ def render_monthly_summary(expanded=True):
         st.markdown("")
 
 
-def render_farm_levels():
+def control_panel():
     st.markdown("---")
     st.subheader("🛠️ Control Panel")
-    with st.expander('🌏 Environment Controls', expanded=st.session_state._environment_controls_expanded):
-        st.markdown("")
-        with st.container():
-            col1, col2 = st.columns([1, 2], gap="medium")
-            with col1:
-                st.markdown("🌡️ Temperature (°C)")
-            with col2:
-                temperature = st.select_slider("temperature",
-                                               options=INPUT_LEVELS["T"],
-                                               key=f"T",
-                                               label_visibility='collapsed',
-                                               on_change=update_monthly_changes,
-                                               kwargs={'type': 'environment', 'var': 'T', 'key': 'T'}
-                                               )
-        with st.container():
-            col1, col2 = st.columns([1, 2], gap="medium")
-            with col1:
-                st.markdown("💧 Humidity (%)")
-            with col2:
-                humidity = st.select_slider("water",
-                                            options=INPUT_LEVELS["H"],
-                                            key=f"H",
-                                            label_visibility='collapsed',
-                                            on_change=update_monthly_changes,
-                                            kwargs={'type': 'environment', 'var': 'H', 'key': 'H'}
-                                            )
-
+    temperature, humidity = env_controls()
     st.markdown('')
     tabs = st.tabs(LEVELS)
     for i, level in enumerate(LEVELS):
@@ -154,87 +131,19 @@ def render_farm_levels():
             level_inputs[level] = {}
             used_area = df_level[df_level["status"] == "growing"]["space"].sum()
             st.markdown(f"###### **Used / Total Space:** {used_area:.2f} / {LEVEL_AREA} m²")
-            with st.expander(f'⚙️ {level} Inputs', expanded=st.session_state._inputs_expanded[level]):
-                st.markdown("")
-                with st.container():
-                    col1, col2 = st.columns([1, 2], gap="medium")
-                    with col1:
-                        st.markdown("💡 Lighting (DLI)")
-                    with col2:
-                        lighting = st.select_slider("lighting",
-                                                    options=INPUT_LEVELS["L"],
-                                                    key=f"L_{level}",
-                                                    label_visibility='collapsed',
-                                                    on_change=update_monthly_changes,
-                                                    kwargs={'type': 'inputs', 'level': level, 'var': 'L', 'key': f'L_{level}'}
-                                                    )
-                with st.container():
-                    col1, col2 = st.columns([1, 2], gap="medium")
-                    with col1:
-                        st.markdown("🌧 Water (mL/plant/day)")
-                    with col2:
-                        water = st.select_slider("water",
-                                                 options=INPUT_LEVELS["W"],
-                                                 key=f"W_{level}",
-                                                 label_visibility='collapsed',
-                                                 on_change=update_monthly_changes,
-                                                 kwargs={'type': 'inputs', 'level': level, 'var': 'W', 'key': f'W_{level}'}
-                                                 )
-                with st.container():
-                    col1, col2 = st.columns([1, 2], gap="medium")
-                    with col1:
-                        st.markdown("🧪 Nutrients (g/plant/day)")
-                    with col2:
-                        nutrients = st.select_slider("nutrients",
-                                                     options=INPUT_LEVELS["N"],
-                                                     key=f"N_{level}",
-                                                     label_visibility='collapsed',
-                                                     on_change=update_monthly_changes,
-                                                     kwargs={'type': 'inputs', 'level': level, 'var': 'N', 'key': f'N_{level}'}
-                                                     )
-                env_inputs["T"] = temperature
-                env_inputs["H"] = humidity
-                level_inputs[level] = {
-                    "L": lighting,
-                    "W": water,
-                    "N": nutrients,
-                    "T": (temperature - 0.1) if level == LEVELS[0] else (temperature + 0.1) if level == LEVELS[
-                        -1] else temperature,
-                    "H": (humidity - 0.1) if level == LEVELS[0] else (humidity + 0.1) if level == LEVELS[
-                        -1] else humidity
-                }
-            with st.expander(f'🌱 Plant Seeds on {level}', expanded=st.session_state._plant_seeds_expanded[level]):
-                with st.form(f"plant_form_{level}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        plant_type = st.selectbox("Plant Type", list(PLANTS.keys()), key=f"pt_{level}")
-                    with col2:
-                        num_plants = st.number_input("Number of Seeds to Plant", min_value=1, max_value=10000, value=1,
-                                                     key=f"np_{level}")
-                    submitted = st.form_submit_button("🌱 Plant Seeds")
-                    if submitted:
-                        plant = PLANTS[plant_type]
-                        needed_area = plant["space_required"] * num_plants
-                        if needed_area > LEVEL_AREA - used_area:
-                            st.error(f"Not enough space on {level}. Available: {LEVEL_AREA - used_area:.2f} m²")
-                        elif st.session_state.budget < plant["seed_cost"] * num_plants:
-                            st.error("Insufficient budget to plant these seeds.")
-                        else:
-                            for _ in range(num_plants):
-                                new_row = {
-                                    "level": level,
-                                    "plant": plant_type,
-                                    "day_planted": st.session_state.month * 30,
-                                    "age": 0,
-                                    "space": plant["space_required"],
-                                    "status": "growing"
-                                }
-                                st.session_state.farm_df = pd.concat(
-                                    [st.session_state.farm_df, pd.DataFrame([new_row])], ignore_index=True)
-                                st.session_state.budget -= plant["seed_cost"]
-                            update_monthly_changes(level=level, type='new_plants', plant=plant_type, num_plants=num_plants)
-                            st.success(f"Planted {num_plants} {plant_type} seeds on {level}!")
-                            st.rerun()
+            lighting, water, nutrients = level_inputs_controls(level)
+            plant_seeds_form(level, used_area)
+            env_inputs["T"] = temperature
+            env_inputs["H"] = humidity
+            level_inputs[level] = {
+                "L": lighting,
+                "W": water,
+                "N": nutrients,
+                "T": (temperature - 0.1) if level == LEVELS[0] else (temperature + 0.1) if level == LEVELS[
+                    -1] else temperature,
+                "H": (humidity - 0.1) if level == LEVELS[0] else (humidity + 0.1) if level == LEVELS[
+                    -1] else humidity
+            }
             df_sorted = df_level.copy()
             df_sorted["status_order"] = df_sorted["status"].map({"growing": 0, "harvested": 1, "dead": 2})
             df_sorted = df_sorted.sort_values("status_order")
@@ -255,83 +164,151 @@ def render_farm_levels():
                     for plant_type in removed_types:
                         num_plants = edited_df.loc[selected, "plant"].value_counts().get(plant_type, 0)
                         if num_plants > 0:
-                            update_monthly_changes(level=level, type='removed_plants', plant=plant_type, num_plants=num_plants)
+                            _update_monthly_changes(level=level, type='removed_plants', plant=plant_type, num_plants=num_plants)
                     st.rerun()
 
 
-def detect_changes():
-    changes = []
-    print(st.session_state.month_changes[st.session_state.month])
-    if st.session_state.month_changes[st.session_state.month]['environment']['T'] is not None:
-        changes.append(f"🌡️ Temperature changed from {st.session_state.month_start_state['env']['T']}°C to {st.session_state.month_changes[st.session_state.month]['environment']['T']}°C")
-    if st.session_state.month_changes[st.session_state.month]['environment']['H'] is not None:
-        changes.append(f"💧 Humidity changed from {st.session_state.month_start_state['env']['H']}% to {st.session_state.month_changes[st.session_state.month]['environment']['H']}%")
-    for l in LEVELS:
-        if st.session_state.month_changes[st.session_state.month]['levels'][l]['N'] is not None:
-            changes.append(f"🧪 {l} Nutrients changed from {st.session_state.month_start_state['levels'][l]['N']}g to {st.session_state.month_changes[st.session_state.month]['levels'][l]['N']}g")
-        if st.session_state.month_changes[st.session_state.month]['levels'][l]['W'] is not None:
-            changes.append(f"🌧 {l} Water changed from {st.session_state.month_start_state['levels'][l]['W']}mL to {st.session_state.month_changes[st.session_state.month]['levels'][l]['W']}mL")
-        if st.session_state.month_changes[st.session_state.month]['levels'][l]['L'] is not None:
-            changes.append(f"💡 {l} Lighting changed from {st.session_state.month_start_state['levels'][l]['L']}DLI to {st.session_state.month_changes[st.session_state.month]['levels'][l]['L']}DLI")
-        for plant, num_plants in st.session_state.month_changes[st.session_state.month]['levels'][l]['new_plants'].items():
-            if num_plants > 0:
-                changes.append(f"🌱 Added {num_plants} new {plant} plants on {l}")
-    return changes
+def env_controls():
+    with st.expander('🌏 Environment Controls', expanded=st.session_state._environment_controls_expanded):
+        st.markdown("")
+        with st.container():
+            col1, col2 = st.columns([1, 2], gap="medium")
+            with col1:
+                st.markdown("🌡️ Temperature (°C)")
+            with col2:
+                temperature = st.select_slider(
+                    "temperature",
+                    options=INPUT_LEVELS["T"],
+                    key=f"T",
+                    label_visibility='collapsed',
+                    on_change=_update_monthly_changes,
+                    kwargs={'type': 'environment', 'var': 'T', 'key': 'T'}
+                )
+        with st.container():
+            col1, col2 = st.columns([1, 2], gap="medium")
+            with col1:
+                st.markdown("💧 Humidity (%)")
+            with col2:
+                humidity = st.select_slider(
+                    "water",
+                    options=INPUT_LEVELS["H"],
+                    key=f"H",
+                    label_visibility='collapsed',
+                    on_change=_update_monthly_changes,
+                    kwargs={'type': 'environment', 'var': 'H', 'key': 'H'}
+                )
+    return temperature, humidity
 
 
-def render_changes():
+def level_inputs_controls(level):
+    with st.expander(f'⚙️ {level} Inputs', expanded=st.session_state._inputs_expanded[level]):
+        st.markdown("")
+        with st.container():
+            col1, col2 = st.columns([1, 2], gap="medium")
+            with col1:
+                st.markdown("💡 Lighting (DLI)")
+            with col2:
+                lighting = st.select_slider(
+                    "lighting",
+                    options=INPUT_LEVELS["L"],
+                    key=f"L_{level}",
+                    label_visibility='collapsed',
+                    on_change=_update_monthly_changes,
+                    kwargs={'type': 'inputs', 'level': level, 'var': 'L', 'key': f'L_{level}'}
+                )
+        with st.container():
+            col1, col2 = st.columns([1, 2], gap="medium")
+            with col1:
+                st.markdown("🌧 Water (mL/plant/day)")
+            with col2:
+                water = st.select_slider(
+                    "water",
+                    options=INPUT_LEVELS["W"],
+                    key=f"W_{level}",
+                    label_visibility='collapsed',
+                    on_change=_update_monthly_changes,
+                    kwargs={'type': 'inputs', 'level': level, 'var': 'W', 'key': f'W_{level}'}
+                )
+        with st.container():
+            col1, col2 = st.columns([1, 2], gap="medium")
+            with col1:
+                st.markdown("🧪 Nutrients (g/plant/day)")
+            with col2:
+                nutrients = st.select_slider(
+                    "nutrients",
+                    options=INPUT_LEVELS["N"],
+                    key=f"N_{level}",
+                    label_visibility='collapsed',
+                    on_change=_update_monthly_changes,
+                    kwargs={'type': 'inputs', 'level': level, 'var': 'N', 'key': f'N_{level}'}
+                )
+    return lighting, water, nutrients
+
+
+def plant_seeds_form(level, used_area):
+    with st.expander(f'🌱 Plant Seeds on {level}', expanded=st.session_state._plant_seeds_expanded[level]):
+        with st.form(f"plant_form_{level}"):
+            col1, col2 = st.columns(2)
+            with col1:
+                plant_type = st.selectbox("Plant Type", list(PLANTS.keys()), key=f"pt_{level}")
+            with col2:
+                num_plants = st.number_input("Number of Seeds to Plant", min_value=1, max_value=10000, value=1, key=f"np_{level}")
+            submitted = st.form_submit_button("🌱 Plant Seeds")
+            if submitted:
+                plant = PLANTS[plant_type]
+                needed_area = plant["space_required"] * num_plants
+                if needed_area > LEVEL_AREA - used_area:
+                    st.error(f"Not enough space on {level}. Available: {LEVEL_AREA - used_area:.2f} m²")
+                elif st.session_state.budget < plant["seed_cost"] * num_plants:
+                    st.error("Insufficient budget to plant these seeds.")
+                else:
+                    for _ in range(num_plants):
+                        new_row = {
+                            "level": level,
+                            "plant": plant_type,
+                            "day_planted": st.session_state.month * 30,
+                            "age": 0,
+                            "space": plant["space_required"],
+                            "status": "growing"
+                        }
+                        st.session_state.farm_df = pd.concat(
+                            [st.session_state.farm_df, pd.DataFrame([new_row])], ignore_index=True)
+                        st.session_state.budget -= plant["seed_cost"]
+                    _update_monthly_changes(level=level, type='new_plants', plant=plant_type, num_plants=num_plants)
+                    st.success(f"Planted {num_plants} {plant_type} seeds on {level}!")
+                    st.rerun()
+
+
+def change_list():
+
+    def detect_changes():
+        changes = []
+        print(st.session_state.month_changes[st.session_state.month])
+        if st.session_state.month_changes[st.session_state.month]['environment']['T'] is not None:
+            changes.append(
+                f"🌡️ Temperature changed from {st.session_state.month_start_state['env']['T']}°C to {st.session_state.month_changes[st.session_state.month]['environment']['T']}°C")
+        if st.session_state.month_changes[st.session_state.month]['environment']['H'] is not None:
+            changes.append(
+                f"💧 Humidity changed from {st.session_state.month_start_state['env']['H']}% to {st.session_state.month_changes[st.session_state.month]['environment']['H']}%")
+        for l in LEVELS:
+            if st.session_state.month_changes[st.session_state.month]['levels'][l]['N'] is not None:
+                changes.append(
+                    f"🧪 {l} Nutrients changed from {st.session_state.month_start_state['levels'][l]['N']}g to {st.session_state.month_changes[st.session_state.month]['levels'][l]['N']}g")
+            if st.session_state.month_changes[st.session_state.month]['levels'][l]['W'] is not None:
+                changes.append(
+                    f"🌧 {l} Water changed from {st.session_state.month_start_state['levels'][l]['W']}mL to {st.session_state.month_changes[st.session_state.month]['levels'][l]['W']}mL")
+            if st.session_state.month_changes[st.session_state.month]['levels'][l]['L'] is not None:
+                changes.append(
+                    f"💡 {l} Lighting changed from {st.session_state.month_start_state['levels'][l]['L']}DLI to {st.session_state.month_changes[st.session_state.month]['levels'][l]['L']}DLI")
+            for plant, num_plants in st.session_state.month_changes[st.session_state.month]['levels'][l][
+                'new_plants'].items():
+                if num_plants > 0:
+                    changes.append(f"🌱 Added {num_plants} new {plant} plants on {l}")
+        return changes
+
     changes = detect_changes()
     for change in changes:
         st.write(change)
-
-
-def update_monthly_changes(type: str, level=None, var=None, val=None, key=None, plant=None, num_plants=0):
-    if key:
-        val = st.session_state.get(key, val)
-    if type == 'environment':
-        if val == st.session_state.month_start_state['env'][var]:
-            st.session_state.month_changes[st.session_state.month]['environment'][var] = None
-        else:
-            st.session_state.month_changes[st.session_state.month]['environment'][var] = val
-        st.session_state._environment_controls_expanded = True
-        st.session_state._inputs_expanded[level] = False
-        st.session_state._plant_seeds_expanded[level] = False
-
-
-    elif type == 'inputs':
-        if val == st.session_state.month_start_state['levels'][level][var]:
-            st.session_state.month_changes[st.session_state.month]['levels'][level][var] = None
-        else:
-            st.session_state.month_changes[st.session_state.month]['levels'][level][var] = val
-        st.session_state._inputs_expanded[level] = True
-        st.session_state._environment_controls_expanded = False
-        st.session_state._plant_seeds_expanded[level] = False
-
-    elif type == 'new_plants':
-        st.session_state.month_changes[st.session_state.month]['levels'][level]['new_plants'][plant] = num_plants
-        st.session_state._plant_seeds_expanded[level] = True
-
-    elif type == 'removed_plants':
-        if plant in st.session_state.month_changes[st.session_state.month]['levels'][level]['new_plants']:
-            st.session_state.month_changes[st.session_state.month]['levels'][level]['new_plants'][plant] -= num_plants
-            st.session_state.month_changes[st.session_state.month]['levels'][level]['new_plants'][plant] = (
-                max(0, st.session_state.month_changes[st.session_state.month]['levels'][level]['new_plants'][plant]))
-        st.session_state._plant_seeds_expanded[level] = True
-        st.session_state._environment_controls_expanded = False
-        st.session_state._inputs_expanded[level] = False
-
-    else:
-        # TODO : Add warning for unknown type
-        return
-
-
-def disable_simulate():
-    st.session_state["simulate_disabled"] = True
-
-def check_justifications(notes=None):
-    if notes is None:
-        notes = st.session_state.get("monthly_notes", "")
-    st.session_state["simulate_disabled"] = notes.strip() == ""
 
 
 def main():
@@ -348,14 +325,14 @@ def main():
     ''', unsafe_allow_html=True)
     st.markdown('---')
     initialize_session_state()
-    render_sidebar()
+    sidebar()
     _just_simulated = st.session_state.get("_just_simulated", False)
 
     with st.container(border=1):
-        render_changes()
+        change_list()
         st.markdown('')
-        notes = st.text_area("📜 Justifications For Changes", max_chars=1000, key="monthly_notes", on_change=disable_simulate)
-        st.button("📝 Check Justifications", key="check_notes", on_click=check_justifications, kwargs={"notes": notes})
+        notes = st.text_area("📜 Justifications For Changes", max_chars=1000, key="monthly_notes", on_change=_disable_simulate)
+        st.button("📝 Check Justifications", key="check_notes", on_click=_check_justifications, kwargs={"notes": notes})
         simulate_disabled = st.session_state.get("simulate_disabled", True)
 
     st.markdown('<div class="centered-btn-container">', unsafe_allow_html=True)
@@ -377,8 +354,8 @@ def main():
         st.rerun()
     st.session_state["_just_simulated"] = False
     st.markdown('')
-    render_monthly_summary(expanded=_just_simulated)
-    render_farm_levels()
+    this_month_results(expanded=_just_simulated)
+    control_panel()
 
 
 if __name__ == "__main__":
