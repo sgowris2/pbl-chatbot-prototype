@@ -1,0 +1,61 @@
+/* vertical_farm/static/custom.css */
+.centered-btn-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin: 0em 0;
+}
+div.stButton > button,
+div.stButton > button:active,
+div.stButton > button:focus {
+    color: white !important;
+}
+.st-key-simulate_next_month > div > button, .st-key-simulate_complete > div > button {
+    height: 50px;
+    padding: 0 1em;
+    font-size: 2em;
+    font-weight: bold;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+    margin: 0 auto;
+    display: block;
+}
+.st-key-simulate_next_month > div > button:hover, .st-key-simulate_complete > div > button:hover {
+    background-color: #388e3c;
+    color: white;
+}
+.st-key-simulate_next_month > div > button:active, .st-key-simulate_complete > div > button:active {
+    background-color: #388e3c;
+    color: white;
+}
+.st-key-factsheet_button > div > button {
+    height: 50px;
+    padding: 0 1em;
+    font-size: 2em;
+    font-weight: bold;
+    background-color: #4C6CB0;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+    margin: 1em auto;
+    display: block;
+}
+.st-key-factsheet_button > div > button:hover {
+    background-color: #506185;
+    color: white;
+}
+/* Make Streamlit expander label font larger */
+.st-emotion-cache-ana9sc p {
+    font-size: 1.2em !important;
+}
+[aria-label="dialog"] {
+    width: 100% !important;
+}
+
