@@ -19,8 +19,10 @@ def initialize_session_state():
         st.session_state.monthly_costs = dict()
         st.session_state.budget = STARTING_BUDGET
         st.session_state.farm_df = pd.DataFrame(columns=[
-            "level", "plant", "day_planted", "age", "space", "status"
+            "level", "plant", "day_planted", "age", "space", "status", "health"
         ])
+        st.session_state.env_inputs = env_inputs
+        st.session_state.level_inputs = level_inputs
         st.session_state.market_prices = PRICES
         st.session_state.monthly_logs = {}
         st.session_state.month_start_state = \
@@ -60,25 +62,34 @@ def sidebar():
 @st.dialog("ⓘ Factsheet", width="large")
 def fact_sheet():
     data = [
-        ["Lettuce", 1, "18–24", "50–70", 20, 12, 0.17, "<12°C slows growth; >30°C causes tip‑burn"],
-        ["Spinach", 1, "16–22", "50–70", 20, 17, 0.25, "Long-day plant; excess light may bolt"],
-        ["Kale", 2, "16–22", "50–70", 20, 17, 0.25, "Grows well leaf-by-leaf; cold tolerant"],
-        ["Swiss Chard", 2, "18–24", "50–70", 20, 17, 0.25, "Continuous harvest possible"],
-        ["Arugula", 1, "18–24", "50–70", 20, 12, 0.20, "Fast growing, ideal for cut harvests"],
-        ["Basil", 1, "20–27", "50–70", 20, 17, 0.20, "Cold-sensitive; mold risk in high humidity"],
-        ["Cilantro", 1, "18–22", "50–70", 20, 17, 0.20, "Bolts >27°C; sensitive to humidity spikes"],
-        ["Microgreens", 0, "20–24", "60–80", 10, 17, 0.05, "Harvest in 1–2 weeks"],
-        ["Tomato (cherry)", 3, "22–26", "60–80", 750, 25, 30, "Fruit set poor <18°C; heat reduces quality"],
-        ["Cucumber", 2, "24–28", "70–90", 750, 25, 27, "Low humidity causes flower drop"],
-        ["Strawberry", 4, "18–24", "60–80", 350, 17, 33, "Sensitive to pH/EC; day-neutral types preferred"],
-        ["Bell Pepper", 3, "19–23", "60–80", 450, 20, 15, "Slow flowering <21°C; needs support"],
-        ["Eggplant", 3, "21–26", "60–80", 500, 20, 20, "Compact varieties preferred for vertical growth"],
-        ["Beans (bush)", 3, "20–28", "60–80", 400, 20, 18, "Needs support; EC ~2.0 ideal"],
+        ["Lettuce", "Leafy Green", 1, "18–24", "50–70", "150–250", "10–14", "0.15–0.25", 0.025, 0.24, "₹150–250"],
+        ["Spinach", "Leafy Green", 1, "16–22", "50–70", "150–250", "12–17", "0.20–0.30", 0.030, 0.15, "₹40–70"],
+        ["Kale", "Leafy Green", 2, "16–22", "50–70", "150–250", "12–17", "0.20–0.30", 0.040, 0.20, "₹150–300"],
+        ["Swiss Chard", "Leafy Green", 2, "18–24", "50–70", "150–250", "12–17", "0.20–0.30", 0.040, 0.30, "₹100–200"],
+        ["Arugula", "Leafy Green", 1, "18–24", "50–70", "150–250", "10–14", "0.15–0.25", 0.020, 0.05, "₹300–400"],
+        ["Basil", "Herb", 1, "20–27", "50–70", "150–250", "14–18", "0.15–0.25", 0.030, 0.05, "₹400–600"],
+        ["Cilantro", "Herb", 1, "18–22", "50–70", "150–250", "14–18", "0.15–0.25", 0.025, 0.05, "₹80–150"],
+        ["Microgreens", "Leafy Green", 0, "20–24", "60–80", "100–150", "10–14", "0.05–0.10", 0.005, 0.03, "₹800–1200"],
+        ["Tomato (cherry)", "Fruit Crop", 3, "22–26", "60–80", "700–850", "22–26", "25–35", 0.150, 4.5, "₹80–150"],
+        ["Tomato (normal)", "Fruit Crop", 4, "20–26", "60–80", "700–850", "22–26", "25–35", 0.200, 5.0, "₹30–80"],
+        ["Cucumber", "Fruit Crop", 2, "24–28", "70–90", "700–850", "22–26", "25–35", 0.120, 2.5, "₹30–60"],
+        ["Strawberry", "Fruit Crop", 4, "18–24", "60–80", "300–400", "14–18", "25–35", 0.100, 0.3, "₹200–400"],
+        ["Bell Pepper", "Fruit Crop", 3, "19–23", "60–80", "400–500", "18–22", "15–25", 0.100, 1.5, "₹60–120"],
+        ["Eggplant", "Fruit Crop", 3, "21–26", "60–80", "400–500", "18–22", "20–30", 0.120, 1.8, "₹30–70"],
+        ["Beans (bush)", "Fruit Crop", 3, "20–28", "60–80", "350–450", "18–22", "15–25", 0.080, 0.4, "₹40–80"],
+        ["Cauliflower", "Root Crop", 3, "16–20", "60–70", "400–600", "14–16", "12–18", 0.180, 0.8, "₹30–70"],
+        ["Carrot", "Root Crop", 3, "16–22", "60–70", "250–400", "14–16", "10–15", 0.060, 0.2, "₹30–60"],
+        ["Potato", "Tuber Crop", 4, "15–20", "60–70", "300–400", "14–16", "15–20", 0.080, 1.0, "₹20–40"],
+        ["Onion", "Bulb Crop", 5, "15–25", "50–70", "250–350", "14–16", "10–15", 0.060, 0.4, "₹20–40"],
+        ["Pumpkin", "Gourd Crop", 5, "20–30", "60–80", "700–900", "18–22", "35–50", 0.500, 3.0, "₹20–40"],
+        ["Mushrooms", "Fungi", 1, "18–22", "85–95", "200–300", "5", "3–7", 0.020, 0.2, "₹100–250"]
     ]
-    df = pd.DataFrame(data, columns=[
-        "Crop", "Months to Maturity", "Temp (°C)", "Humidity (%)",
-        "Water (mL/day)", "Light (DLI)", "Nutrients (g/day)", "Tolerances / Notes"
-    ])
+    columns = [
+        "Crop", "Category", "Months to Maturity", "Temp (°C)", "Humidity (%)",
+        "Water (mL/day)", "Light (DLI)", "Nutrients (g/day)",
+        "Space (m²/plant)", "Yield (kg/plant)", "Price (₹/kg)"
+    ]
+    df = pd.DataFrame(data, columns=columns)
     st.table(df)
 
 
@@ -132,7 +143,6 @@ def control_panel():
     for i, level in enumerate(LEVELS):
         with tabs[i]:
             df_level = st.session_state.farm_df[st.session_state.farm_df.level == level]
-            level_inputs[level] = {}
             used_area = df_level[df_level["status"] == "Growing"]["space"].sum()
             st.markdown(f"###### **Used / Total Space:** {used_area:.2f} / {LEVEL_AREA} m²")
             lighting, water, nutrients = level_inputs_controls(level)
@@ -158,8 +168,8 @@ def control_panel():
                 key=f"editor_{level}",
                 num_rows="dynamic",
                 use_container_width=True,
-                column_order=["select", "plant", "status", "age", "space", "day_planted", "level"],
-                disabled=["plant", "status", "age", "space", "day_planted", "level"],
+                column_order=["select", "plant", "status", "health", "age"],
+                disabled=["plant", "status", "health", "age"],
                 hide_index=True
             )
             selected = edited_df[edited_df["select"]].index.tolist()
@@ -186,6 +196,7 @@ def env_controls():
                     "temperature",
                     options=INPUT_LEVELS["T"],
                     key=f"T",
+                    value=st.session_state.T if 'T' in st.session_state else st.session_state.env_inputs["T"],
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'environment', 'var': 'T', 'key': 'T'}
@@ -199,6 +210,7 @@ def env_controls():
                     "water",
                     options=INPUT_LEVELS["H"],
                     key=f"H",
+                    value=st.session_state.H if 'H' in st.session_state else st.session_state.env_inputs["H"],
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'environment', 'var': 'H', 'key': 'H'}
@@ -218,6 +230,7 @@ def level_inputs_controls(level):
                     "lighting",
                     options=INPUT_LEVELS["L"],
                     key=f"L_{level}",
+                    value=st.session_state.get(f"L_{level}", st.session_state.level_inputs[level]["L"]),
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'inputs', 'level': level, 'var': 'L', 'key': f'L_{level}'}
@@ -231,6 +244,7 @@ def level_inputs_controls(level):
                     "water",
                     options=INPUT_LEVELS["W"],
                     key=f"W_{level}",
+                    value=st.session_state.get(f"W_{level}", st.session_state.level_inputs[level]["W"]),
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'inputs', 'level': level, 'var': 'W', 'key': f'W_{level}'}
@@ -244,6 +258,7 @@ def level_inputs_controls(level):
                     "nutrients",
                     options=INPUT_LEVELS["N"],
                     key=f"N_{level}",
+                    value=st.session_state.get(f"N_{level}", st.session_state.level_inputs[level]["N"]),
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'inputs', 'level': level, 'var': 'N', 'key': f'N_{level}'}
@@ -258,7 +273,7 @@ def plant_seeds_form(level, used_area):
             with col1:
                 plant_type = st.selectbox("Plant Type", list(PLANTS.keys()), key=f"pt_{level}")
             with col2:
-                num_plants = st.number_input("Number of Seeds to Plant", min_value=1, max_value=10000, value=1, key=f"np_{level}")
+                num_plants = st.number_input("Number of Seeds to Plant", min_value=0, max_value=10000, value=0, key=f"np_{level}")
             submitted = st.form_submit_button("🌱 Plant Seeds")
             if submitted:
                 plant = PLANTS[plant_type]
@@ -275,7 +290,8 @@ def plant_seeds_form(level, used_area):
                             "day_planted": st.session_state.month * 30,
                             "age": 0,
                             "space": plant["space_required"],
-                            "status": "Growing"
+                            "status": "Growing",
+                            "health": 1.0  # Initial health is 100%
                         }
                         st.session_state.farm_df = pd.concat([st.session_state.farm_df, pd.DataFrame([new_row])], ignore_index=True)
                     _update_monthly_changes(level=level, type='new_plants', plant=plant_type, num_plants=num_plants)
@@ -287,7 +303,6 @@ def change_list():
 
     def detect_changes():
         changes = []
-        print(st.session_state.month_changes[st.session_state.month])
         if st.session_state.month_changes[st.session_state.month]['environment']['T'] is not None:
             changes.append(
                 f"🌡️ Temperature changed from {st.session_state.month_start_state['env']['T']}°C to {st.session_state.month_changes[st.session_state.month]['environment']['T']}°C")
@@ -361,7 +376,8 @@ def main():
         st.session_state["_just_simulated"] = True
         st.session_state.month_start_state = {
             'farm_df': st.session_state.farm_df.__deepcopy__(),
-            'env': level_inputs.copy()
+            'env': st.session_state.env_inputs.copy(),
+            'levels': st.session_state.level_inputs.copy(),
         }
         st.rerun()
     st.session_state["_just_simulated"] = False

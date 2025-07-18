@@ -8,28 +8,18 @@ PRICES = {"Tomato": 30, "Lettuce": 60}
 LEVELS = ["Level 1", "Level 2", "Level 3"]
 LEVEL_AREA = 25.0  # m^2 per level
 INPUT_VARS = ["N", "W", "L", "T", "H"]  # Nutrients, Water, Light, Temperature, Humidity
-INPUT_LEVELS = {
-    "N": [x for x in range(0, 51)],
-    "W": [x for x in range(0, 1001, 10)],
-    "L": [x for x in range(0, 31)],
-    "T": [x for x in range(10, 46)],
-    "H": [x for x in range(0, 101, 5)]
-}
+INPUT_LEVELS = {"N": [x for x in range(0, 51)], "W": [x for x in range(0, 1001, 10)], "L": [x for x in range(0, 31)],
+    "T": [x for x in range(10, 46)], "H": [x for x in range(0, 101, 5)]}
 RENT = LEVEL_AREA * 100
 
-env_inputs = {"T": 10, "H": 0.0}
+env_inputs = {"T": 24, "H": 50.0}
 level_inputs = {x: {k: v[0] for k, v in INPUT_LEVELS.items()} for x in LEVELS}
 
 
 def _to_human_readable(var):
-    dictionary = {
-        "N": "nutrients",
-        "W": "water",
-        "L": "light",
-        "T": "temperature",
-        "H": "humidity"
-    }
+    dictionary = {"N": "nutrients", "W": "water", "L": "light", "T": "temperature", "H": "humidity"}
     return dictionary.get(var, var)
+
 
 def _format_list(items):
     if not items:
@@ -46,99 +36,43 @@ def response(x, ideal, tolerance):
     if abs(x - ideal) <= tolerance:
         return 1.0
     elif abs(x - ideal) <= 2 * tolerance:
-        return 0.7
+        return 0.9
     elif abs(x - ideal) <= 3 * tolerance:
-        return 0.4
+        return 0.7
     else:
-        return 0.1
+        return 0.5
 
-# def normalize_inputs(inputs):
-#     normalized = {}
-#     for var in INPUT_VARS:
-#         if var in inputs:
-#             if isinstance(inputs[var], list):
-#                 normalized[var] = [min(max(v, 0), 1) for v in inputs[var]]
-#             else:
-#                 normalized[var] = min(max(inputs[var], 0), 1)
-#         else:
-#             normalized[var] = 0.0
-#     return normalized
 
-def plant_growth_score(plant, env):
+def plant_health_score(plant, env):
     min_r = 1.0
     for var in INPUT_VARS:
         r = response(env[var], plant["ideal"][var], plant["tolerance"][var])
         if r < min_r:
             min_r = r
-    return plant["Gmax"] * min_r
+    return min_r
+
+
+def get_plant_yield(plant, health_score):
+    return plant["Gmax"] * health_score
 
 
 def simulate_disturbance(plant, env):
-
     # Find disturbance probability based on plant type and environment
     max_percent_difference = 0
     adverse_variables = []
 
     for var in INPUT_VARS:
-        if (plant['ideal'][var] - plant['tolerance'][var]) <= env[var] <= (plant['ideal'][var] + plant['tolerance'][var]):
+        if (plant['ideal'][var] - plant['tolerance'][var]) <= env[var] <= (
+                plant['ideal'][var] + plant['tolerance'][var]):
             continue
         adverse_variables.append(var)
-        percent_difference = abs(env[var] - plant["ideal"][var]) / plant["ideal"][var]
+        if env[var] > plant['ideal'][var]:
+            percent_difference = abs(env[var] - (plant["ideal"][var] + plant['tolerance'][var])) / plant["tolerance"][var]
+        else:
+            percent_difference = abs((plant["ideal"][var] - plant['tolerance'][var]) - env[var]) / plant["tolerance"][var]
         if percent_difference > max_percent_difference:
             max_percent_difference = percent_difference
-    return (np.random.rand() > (1 - max_percent_difference)), adverse_variables
-
-
-def simulate_month():
-
-    updates = []
-    monthly_update = []
-
-    month_cost, rent_cost, seeds_cost, elec_cost, water_cost, nutrients_cost = calculate_month_cost()
-
-    for idx, row in st.session_state.farm_df.iterrows():
-        if row["status"] != "Growing":
-            continue
-        plant = PLANTS[row["plant"]]
-        env = level_inputs[row["level"]].copy()
-        score = plant_growth_score(plant, env)
-        dead, adverse_variables = simulate_disturbance(plant, env)
-        if dead:
-            reasons = [_to_human_readable(x) for x in adverse_variables]
-            updates.append((idx, f"Dead - Unbalanced {_format_list(reasons)}", 0))
-        elif row["age"] >= plant["growth_days"]:
-            yield_kg = score * plant["yield_per_plant"]
-            revenue = round(yield_kg * st.session_state.market_prices[row["plant"]], 2)
-            updates.append((idx, "Harvested", revenue))
-
-    st.session_state.budget -= month_cost
-
-    for idx, status, reward in updates:
-        st.session_state.farm_df.at[idx, "status"] = status
-        st.session_state.budget += reward
-        monthly_update.append({"plant": st.session_state.farm_df.at[idx, "plant"],
-                               "level": st.session_state.farm_df.at[idx, "level"],
-                               "status": status,
-                               "revenue": reward})
-
-    for plant in st.session_state.market_prices:
-        change = np.random.uniform(-0.1, 0.1)
-        st.session_state.market_prices[plant] *= (1 + change)
-        st.session_state.market_prices[plant] = round(st.session_state.market_prices[plant], 2)
-
-    st.session_state.monthly_logs[st.session_state.month] = monthly_update
-    st.session_state.monthly_costs[st.session_state.month] = {
-        "rent": rent_cost,
-        "seeds": seeds_cost,
-        "electricity": elec_cost,
-        "water": water_cost,
-        "nutrients": nutrients_cost,
-        'overall': month_cost
-    }
-
-    st.session_state.month += 1
-    st.session_state.farm_df["age"] += 30
-    return
+    return np.random.rand() > (1.0 - ((max_percent_difference**2) * 0.1)), adverse_variables
 
 
 def calculate_month_cost():
@@ -148,10 +82,7 @@ def calculate_month_cost():
     nutrients_costs = 0
     rent_costs = RENT
     for level in LEVELS:
-        print(st.session_state.month_changes[st.session_state.month])
         new_plants = st.session_state.month_changes[st.session_state.month]['levels'][level]['new_plants']
-        print('New Plants:')
-        print(new_plants)
         for plant in new_plants:
             plant_info = PLANTS[plant]
             seed_costs += plant_info["seed_cost"] * new_plants[plant]
@@ -167,3 +98,51 @@ def calculate_month_cost():
     month_cost = round(rent_costs + seed_costs + elec_costs + water_costs + nutrients_costs, 2)
 
     return month_cost, rent_costs, seed_costs, elec_costs, water_costs, nutrients_costs
+
+
+def simulate_month():
+    updates = []
+    monthly_update = []
+
+    # Choose random market prices for each plant based on binomial distribution
+    for plant in PLANTS:
+        st.session_state.market_prices[plant] = np.random.binomial(1, 0.5, 1)[0] * (
+                    PLANTS[plant]["price_range"][1] - PLANTS[plant]["price_range"][0]) + PLANTS[plant]["price_range"][0]
+
+    # Calculate the monthly costs
+    month_cost, rent_cost, seeds_cost, elec_cost, water_cost, nutrients_cost = calculate_month_cost()
+
+    # Calculate revenue
+    for idx, row in st.session_state.farm_df.iterrows():
+        if row["status"] == "Growing":
+            plant = PLANTS[row["plant"]]
+            env = level_inputs[row["level"]].copy()
+            dead, adverse_variables = simulate_disturbance(plant, env)
+            if dead:
+                reasons = [_to_human_readable(x) for x in adverse_variables]
+                updates.append((idx, f"Dead - Unbalanced {_format_list(reasons)}", 0, 0))
+            elif row["age"] >= plant["growth_days"]:
+                yield_kg = get_plant_yield(plant, row["health"])
+                revenue = round(yield_kg * st.session_state.market_prices[row["plant"]], 2)
+                updates.append((idx, "Harvested", row["health"], revenue))
+            else:
+                health_score = plant_health_score(plant, env)
+                updates.append((idx, "Growing", health_score * row["health"], 0))
+
+    st.session_state.budget -= month_cost
+
+    # Update the farm DataFrame and monthly logs
+    for idx, status, health, reward in updates:
+        st.session_state.farm_df.at[idx, "status"] = status
+        st.session_state.budget += reward
+        monthly_update.append(
+            {"plant": st.session_state.farm_df.at[idx, "plant"], "level": st.session_state.farm_df.at[idx, "level"],
+             "status": status, "health": health, "revenue": reward})
+    st.session_state.monthly_logs[st.session_state.month] = monthly_update
+    st.session_state.monthly_costs[st.session_state.month] = {"rent": rent_cost, "seeds": seeds_cost,
+        "electricity": elec_cost, "water": water_cost, "nutrients": nutrients_cost, 'overall': month_cost}
+
+    # Increment the month and age of surviving plants
+    st.session_state.month += 1
+    st.session_state.farm_df.loc[st.session_state.farm_df["status"] == "Growing", "age"] += 30
+    return
