@@ -10,19 +10,19 @@ from vertical_farm.ui_callbacks import _update_monthly_changes, _disable_simulat
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from vertical_farm.data import PLANTS
-from vertical_farm.simulator import simulate_month, LEVELS, LEVEL_AREA, INPUT_LEVELS, level_inputs, env_inputs
+from vertical_farm.simulator import simulate_month, STARTING_BUDGET, PRICES, LEVELS, LEVEL_AREA, INPUT_LEVELS, level_inputs, env_inputs
 
 
 def initialize_session_state():
     if "user_id" not in st.session_state:
         st.session_state.user_id = str(uuid.uuid4())
         st.session_state.month = 0
-        st.session_state.monthly_op_costs = dict()
-        st.session_state.budget = 1000.0
+        st.session_state.monthly_costs = dict()
+        st.session_state.budget = STARTING_BUDGET
         st.session_state.farm_df = pd.DataFrame(columns=[
             "level", "plant", "day_planted", "age", "space", "status"
         ])
-        st.session_state.market_prices = {"Tomato": 12, "Lettuce": 8}
+        st.session_state.market_prices = PRICES
         st.session_state.monthly_logs = {}
         st.session_state.month_start_state = \
             {
@@ -88,7 +88,7 @@ def performance_panel(expanded=True):
         total_revenue = sum(
             sum(log["revenue"] for log in month_log) for month_log in st.session_state.monthly_logs.values()
         )
-        total_cost = sum(st.session_state.monthly_op_costs.values())
+        total_cost = sum([x['overall'] for x in st.session_state.monthly_costs.values()])
         profit = total_revenue - total_cost
         st.table(pd.DataFrame.from_dict({
             'Total Revenue': f"{total_revenue:.2f}",
@@ -99,19 +99,24 @@ def performance_panel(expanded=True):
 
 
 def this_month_results(expanded=True):
-    this_month = st.session_state.month
+    this_month = st.session_state.month - 1
     with st.expander("📈 This Month's Results", expanded=expanded):
-        if this_month > 0:
+        if this_month >= 0:
             month_log = st.session_state.monthly_logs.get(this_month, [])
             if month_log:
                 df_log = pd.DataFrame(month_log)
                 summary = df_log.groupby("plant").agg(
-                    Died=("status", lambda x: (x == "dead").sum()),
-                    Harvested=("status", lambda x: (x == "harvested").sum()),
-                    Revenue=("revenue", "sum")
+                    died=("status", lambda x: (x.str.contains("Dead")).sum()),
+                    harvested=("status", lambda x: (x == "Harvested").sum()),
+                    revenue=("revenue", "sum")
                 )
-                summary['Cost'] = st.session_state.monthly_op_costs.get(this_month, 0.0)
                 st.dataframe(summary)
+                st.markdown("**Total Monthly Cost**: ₹{:.2f}".format(st.session_state.monthly_costs.get(this_month, 0.0)['overall']))
+                st.markdown("Rent: ₹{:.2f}".format(st.session_state.monthly_costs.get(this_month, 0.0)['rent']))  # Assuming half for rent
+                st.markdown("Seeds Cost: ₹{:.2f}".format(st.session_state.monthly_costs.get(this_month, 0.0)['seeds']))
+                st.markdown("Electricity Cost: ₹{:.2f}".format(st.session_state.monthly_costs.get(this_month, 0.0)['electricity']))
+                st.markdown("Water Cost: ₹{:.2f}".format(st.session_state.monthly_costs.get(this_month, 0.0)['water']))
+                st.markdown("Nutrients Cost: ₹{:.2f}".format(st.session_state.monthly_costs.get(this_month, 0.0)['nutrients']))
             else:
                 st.info("No changes this month.")
         else:
@@ -129,7 +134,7 @@ def control_panel():
         with tabs[i]:
             df_level = st.session_state.farm_df[st.session_state.farm_df.level == level]
             level_inputs[level] = {}
-            used_area = df_level[df_level["status"] == "growing"]["space"].sum()
+            used_area = df_level[df_level["status"] == "Growing"]["space"].sum()
             st.markdown(f"###### **Used / Total Space:** {used_area:.2f} / {LEVEL_AREA} m²")
             lighting, water, nutrients = level_inputs_controls(level)
             plant_seeds_form(level, used_area)
@@ -145,18 +150,20 @@ def control_panel():
                     -1] else humidity
             }
             df_sorted = df_level.copy()
-            df_sorted["status_order"] = df_sorted["status"].map({"growing": 0, "harvested": 1, "dead": 2})
+            df_sorted["status_order"] = df_sorted["status"].map({"Growing": 0, "Harvested": 1, "Dead": 2})
             df_sorted = df_sorted.sort_values("status_order")
-            df_sorted["selected"] = False
+            df_sorted["select"] = False
+            df_sorted = df_sorted.reset_index(drop=True)
             edited_df = st.data_editor(
                 df_sorted.drop(columns=["status_order"]),
                 key=f"editor_{level}",
                 num_rows="dynamic",
                 use_container_width=True,
-                column_order=["selected", "plant", "status", "age", "space", "day_planted", "level"],
-                disabled=["plant", "status", "age", "space", "day_planted", "level"]
+                column_order=["select", "plant", "status", "age", "space", "day_planted", "level"],
+                disabled=["plant", "status", "age", "space", "day_planted", "level"],
+                hide_index=True
             )
-            selected = edited_df[edited_df["selected"]].index.tolist()
+            selected = edited_df[edited_df["select"]].index.tolist()
             if selected:
                 if st.button("Remove Selected Plants", key=f"delete_rows_{level}"):
                     st.session_state.farm_df.drop(index=selected, inplace=True)
@@ -269,11 +276,9 @@ def plant_seeds_form(level, used_area):
                             "day_planted": st.session_state.month * 30,
                             "age": 0,
                             "space": plant["space_required"],
-                            "status": "growing"
+                            "status": "Growing"
                         }
-                        st.session_state.farm_df = pd.concat(
-                            [st.session_state.farm_df, pd.DataFrame([new_row])], ignore_index=True)
-                        st.session_state.budget -= plant["seed_cost"]
+                        st.session_state.farm_df = pd.concat([st.session_state.farm_df, pd.DataFrame([new_row])], ignore_index=True)
                     _update_monthly_changes(level=level, type='new_plants', plant=plant_type, num_plants=num_plants)
                     st.success(f"Planted {num_plants} {plant_type} seeds on {level}!")
                     st.rerun()
@@ -304,11 +309,16 @@ def change_list():
                 'new_plants'].items():
                 if num_plants > 0:
                     changes.append(f"🌱 Added {num_plants} new {plant} plants on {l}")
+
+        if not changes:
+            changes.append("No changes yet this month.")
+
         return changes
 
     changes = detect_changes()
-    for change in changes:
-        st.write(change)
+    with st.container():
+        for change in changes:
+            st.info(change)
 
 
 def main():
@@ -329,18 +339,21 @@ def main():
     _just_simulated = st.session_state.get("_just_simulated", False)
 
     with st.container(border=1):
+        st.markdown("#### Current Month's Actions")
         change_list()
         st.markdown('')
-        notes = st.text_area("📜 Justifications For Changes", max_chars=1000, key="monthly_notes", on_change=_disable_simulate)
-        st.button("📝 Check Justifications", key="check_notes", on_click=_check_justifications, kwargs={"notes": notes})
+        notes = st.text_area("📜 Reasons", max_chars=1000, key="monthly_notes", on_change=_disable_simulate)
+        st.button("✅ Check Reasoning", key="check_notes", on_click=_check_justifications, kwargs={"notes": notes})
         simulate_disabled = st.session_state.get("simulate_disabled", True)
 
     st.markdown('<div class="centered-btn-container">', unsafe_allow_html=True)
     st.markdown('')
     if st.session_state.month < 12:
-        simulate_button = st.button("▶▶ Simulate One Month", key="simulate_next_month", disabled=simulate_disabled)
+        simulate_button = st.button("▶▶ Simulate Next Month", key="simulate_next_month", disabled=simulate_disabled)
     else:
-        simulate_button = st.button("Complete Game 🚩", key="simulate_complete", disabled=simulate_disabled)
+        simulate_button = st.button("End Game 🚩", key="simulate_complete", disabled=simulate_disabled)
+    if simulate_disabled:
+        st.warning('Please provide reasons for your actions and get them checked before simulating the next month.', icon="⚠️")
     st.markdown('</div>', unsafe_allow_html=True)
 
     if simulate_button:
