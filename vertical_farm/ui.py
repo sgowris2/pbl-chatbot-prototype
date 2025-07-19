@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 import uuid
 
@@ -7,14 +8,15 @@ import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from vertical_farm.data import PLANTS
-from vertical_farm.simulator import simulate_month, STARTING_BUDGET, PRICES, LEVELS, LEVEL_AREA, INPUT_LEVELS, level_inputs, env_inputs
+from vertical_farm.data import PLANTS, ITEM_ICONS
+from vertical_farm.simulator import simulate_month, STARTING_BUDGET, PRICES, LEVELS, LEVEL_AREA, INPUT_LEVELS, level_inputs, env_inputs, generate_market_day_customers
 from vertical_farm.ui_callbacks import _update_monthly_changes, _disable_simulate, _check_justifications
 
 
 def initialize_session_state():
     if "user_id" not in st.session_state:
         st.session_state.user_id = str(uuid.uuid4())
+        st.session_state.screen = "farm"
         st.session_state.month = 0
         st.session_state.monthly_costs = dict()
         st.session_state.budget = STARTING_BUDGET
@@ -40,7 +42,18 @@ def initialize_session_state():
         st.session_state._environment_controls_expanded = False
         st.session_state._inputs_expanded = {l: False for l in LEVELS}
         st.session_state._plant_seeds_expanded = {l: False for l in LEVELS}
-
+        st.session_state.harvest_store = {x: 0 for x in PLANTS.keys()}
+        st.session_state.customers = [{
+            "id": 1,
+            "demand": {},
+            "min_price": 0,
+            "max_price": 0,
+            "accepted": False
+        }]
+        st.session_state.current_customer = 0
+        st.session_state.customer_offer_submitted = False
+        st.session_state.revenue = 0
+        st.session_state.results = []
 
 def sidebar():
     st.sidebar.header("Info Panel")
@@ -93,11 +106,125 @@ def fact_sheet():
     st.table(df)
 
 
+def market_day_screen():
+
+    idx = st.session_state.current_customer
+    if idx >= 10:
+        st.session_state.screen = "summary"
+        st.rerun()
+
+    customer = st.session_state.customers[idx]
+    customer_icon = random.choice(["👩", "👨", "👵", "👴", "👩‍🌾", "👨‍🌾", "👩‍🍳", "👨‍🍳", "👩‍💼",
+                                    "👨‍💼", "👩‍🎓", "👨‍🎓", "👩‍🔧", "👨‍🔧", "👩‍💻", "👨‍💻"])
+    st.header(f"🧺 Market Day #{st.session_state.month + 1}")
+    st.markdown("Welcome to the market day! You will meet 10 customers today. "
+                "Each customer has specific demands and a maximum price they are willing to pay. "
+                "Your goal is to sell your produce at fair prices. "
+                "Remember that customers only listen to one offer.")
+    st.markdown('')
+    with st.container(border=1):
+        st.write(f"**Your Produce**:")
+        for item, qty in st.session_state.harvest_store.items():
+            item_icon = ITEM_ICONS.get(item, "📦")  # Default icon if not found
+            st.write(f"{item} {item_icon}  :  {qty}kg")
+    st.markdown("---")
+    st.markdown(f"### {customer_icon} Customer {idx + 1} of 10")
+    st.write("#### Asking for:\n")
+    for item, qty in customer["demand"].items():
+        if qty > 0:
+            item_icon = ITEM_ICONS.get(item, "📦")  # Default icon if not found
+            st.write(f"{item} {item_icon}  :  {qty}kg")
+    st.markdown('')
+
+    col1, col2 = st.columns([2, 1], gap='small', vertical_alignment='bottom')
+
+    with col1:
+        offer = st.number_input("Enter your total offer price (₹)", min_value=0, key=f"offer_{idx}",
+                                disabled=st.session_state.customer_offer_submitted)
+        enough = True
+
+    with col2:
+        if st.button("➤ Submit Offer", key=f"submit_{idx}", disabled=st.session_state.customer_offer_submitted):
+            enough = all(
+                st.session_state.harvest_store.get(item, 0) >= qty
+                for item, qty in customer["demand"].items()
+            )
+            if not enough:
+                st.error("❌ Not enough inventory.")
+            else:
+                accepted = offer <= customer["max_price"]
+                if accepted:
+                    st.success("✅ Accepted!")
+                    st.session_state.revenue += offer
+                    customer['accepted'] = True
+                    for item, qty in customer["demand"].items():
+                        st.session_state.harvest_store[item] -= qty
+                else:
+                    st.warning("❌ Rejected.")
+
+                st.session_state.results.append({
+                    "customer": idx + 1,
+                    "accepted": accepted,
+                    "price": offer
+                })
+                st.session_state.customer_offer_submitted = True
+                st.rerun()
+
+    if st.session_state.customer_offer_submitted:
+        if customer['accepted']:
+            st.success("✅ Offer Accepted!")
+        elif not enough:
+            st.error("❌ Not enough inventory.")
+        elif not customer['accepted']:
+            st.warning("❌ Offer Rejected.")
+    else:
+        st.info("Submit an offer or skip this customer.")
+
+    st.markdown('')
+    if st.button(f"{'⏩ Next' if st.session_state.customer_offer_submitted else '❌ Skip'} Customer", key=f"skip_customer"):
+        st.session_state.results.append({
+            "customer": idx + 1,
+            "accepted": False,
+            "price": 0
+        })
+        st.session_state.current_customer += 1
+        st.session_state.customer_offer_submitted = False
+        st.rerun()
+
+
+def summary_screen():
+    st.header(f"📊 Market Day #{st.session_state.month + 1} Summary")
+    st.markdown("Welcome to the market day! You will meet 10 customers today. "
+                "Each customer has specific demands and a maximum price they are willing to pay. "
+                "Your goal is to sell your produce at fair prices. "
+                "Remember that customers only listen to one offer.")
+    st.markdown('')
+    with st.container(border=1):
+        st.markdown(f"##### 💰 You sold produce worth: ₹{st.session_state.revenue}")
+
+    st.markdown('')
+    st.write("**Results:**")
+    for res in st.session_state.results:
+        status = "✅ Accepted" if res["accepted"] else "❌ Rejected"
+        if status == "✅ Accepted":
+            st.success(f"Customer {res['customer']}: ₹{res['price']} — {status}")
+        else:
+            st.warning(f"Customer {res['customer']}: ₹{res['price']} — {status}")
+
+    st.write("**Wasted Produce:**")
+    for item, qty in st.session_state.harvest_store.items():
+        item_icon = ITEM_ICONS.get(item, "📦")  # Default icon if not found
+        st.write(f"{item} {item_icon}  :  {qty}kg")
+
+    if st.button("🚜 Back To The Farm", key=f"back_to_farm"):
+        st.session_state.current_customer = 0
+        st.session_state.screen = "farm"
+        st.rerun()
+
+
 def performance_panel(expanded=True):
     with st.expander("📊 Farm Performance", expanded=expanded):
-        total_revenue = sum(
-            sum(log["revenue"] for log in month_log) for month_log in st.session_state.monthly_logs.values()
-        )
+        total_revenue = st.session_state.revenue
         total_cost = sum([x['overall'] for x in st.session_state.monthly_costs.values()])
         profit = total_revenue - total_cost
         st.table(pd.DataFrame.from_dict({
@@ -163,6 +290,7 @@ def control_panel():
             df_sorted = df_sorted.sort_values("status_order")
             df_sorted["select"] = False
             df_sorted = df_sorted.reset_index(drop=True)
+            df_sorted["health"] = df_sorted["health"].apply(lambda x: f"{x * 100:.0f}%")
             edited_df = st.data_editor(
                 df_sorted.drop(columns=["status_order"]),
                 key=f"editor_{level}",
@@ -352,38 +480,46 @@ def main():
     sidebar()
     _just_simulated = st.session_state.get("_just_simulated", False)
 
-    with st.container(border=1):
-        st.markdown("#### Current Month's Actions")
-        change_list()
-        st.markdown('')
-        notes = st.text_area("📜 Reasons", max_chars=1000, key="monthly_notes", on_change=_disable_simulate)
-        st.button("✅ Check Reasoning", key="check_notes", on_click=_check_justifications, kwargs={"notes": notes})
-        simulate_disabled = st.session_state.get("simulate_disabled", True)
-
-    st.markdown('<div class="centered-btn-container">', unsafe_allow_html=True)
-    st.markdown('')
-    if st.session_state.month < 12:
-        simulate_button = st.button("▶▶ Simulate Next Month", key="simulate_next_month", disabled=simulate_disabled)
+    if st.session_state.screen == "market":
+        market_day_screen()
+    elif st.session_state.screen == "summary":
+        summary_screen()
     else:
-        simulate_button = st.button("End Game 🚩", key="simulate_complete", disabled=simulate_disabled)
-    if simulate_disabled:
-        st.warning('Please provide reasons for your actions and get them checked before simulating the next month.', icon="⚠️")
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    if simulate_button:
-        simulate_month()
-        st.success("Month simulated!")
-        st.session_state["_just_simulated"] = True
-        st.session_state.month_start_state = {
-            'farm_df': st.session_state.farm_df.__deepcopy__(),
-            'env': st.session_state.env_inputs.copy(),
-            'levels': st.session_state.level_inputs.copy(),
-        }
-        st.rerun()
-    st.session_state["_just_simulated"] = False
-    st.markdown('')
-    this_month_results(expanded=_just_simulated)
-    control_panel()
+        with st.container(border=1):
+            st.markdown("#### Current Month's Actions")
+            change_list()
+            st.markdown('')
+            notes = st.text_area("📜 Reasons", max_chars=1000, key="monthly_notes", on_change=_disable_simulate)
+            st.button("✅ Check Reasoning", key="check_notes", on_click=_check_justifications, kwargs={"notes": notes})
+            simulate_disabled = st.session_state.get("simulate_disabled", True)
+
+        st.markdown('<div class="centered-btn-container">', unsafe_allow_html=True)
+        st.markdown('')
+        if st.session_state.month < 12:
+            simulate_button = st.button("▶▶ Simulate Next Month", key="simulate_next_month", disabled=simulate_disabled)
+        else:
+            simulate_button = st.button("End Game 🚩", key="simulate_complete", disabled=simulate_disabled)
+        if simulate_disabled:
+            st.warning('Please provide reasons for your actions and get them checked before simulating the next month.', icon="⚠️")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if simulate_button:
+            simulate_month()
+            st.success("Month simulated!")
+            st.session_state["_just_simulated"] = True
+            st.session_state.month_start_state = {
+                'farm_df': st.session_state.farm_df.__deepcopy__(),
+                'env': st.session_state.env_inputs.copy(),
+                'levels': st.session_state.level_inputs.copy(),
+            }
+            st.session_state.screen = "market"
+            generate_market_day_customers()
+            st.rerun()
+        st.session_state["_just_simulated"] = False
+        st.markdown('')
+        this_month_results(expanded=_just_simulated)
+        control_panel()
 
 
 if __name__ == "__main__":

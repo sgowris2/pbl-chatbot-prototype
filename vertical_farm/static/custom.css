@@ -58,6 +58,13 @@
 .st-key-factsheet_button > div > button:focus  {
     color: white !important;
 }
+
+.st-key-skip_customer > div > button, .st-key-back_to_farm > div > button {
+    padding: 0 1em;
+    margin: 1em auto;
+    display: block;
+}
+
 /* Make Streamlit expander label font larger */
 .st-emotion-cache-ana9sc p {
     font-size: 1.2em !important;

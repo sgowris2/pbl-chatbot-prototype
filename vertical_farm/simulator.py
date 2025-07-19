@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import streamlit as st
 
@@ -34,11 +36,11 @@ def _format_list(items):
 
 def response(x, ideal, tolerance):
     if abs(x - ideal) <= tolerance:
-        return 1.0
+        return random.choice([1.0, 0.99, 0.98, 0.97, 0.96, 0.95])  # Randomly choose between 1.0 and 0.95 for ideal conditions
     elif abs(x - ideal) <= 2 * tolerance:
-        return 0.9
+        return random.choice([0.85, 0.86, 0.87, 0.88, 0.89, 0.9, 0.91, 0.92, 0.93, 0.94])  # Randomly choose between 0.85 and 0.9 for near-ideal conditions
     elif abs(x - ideal) <= 3 * tolerance:
-        return 0.7
+        return random.choice([0.7, 0.75, 0.8])  # Randomly choose between 0.7 and 0.8 for moderate conditions
     else:
         return 0.5
 
@@ -53,7 +55,7 @@ def plant_health_score(plant, env):
 
 
 def get_plant_yield(plant, health_score):
-    return plant["Gmax"] * health_score
+    return round(plant["Gmax"] * health_score, 0)
 
 
 def simulate_disturbance(plant, env):
@@ -104,6 +106,10 @@ def simulate_month():
     updates = []
     monthly_update = []
 
+    # Remove plants that are not growing anymore
+    st.session_state.farm_df.drop(index=st.session_state.farm_df[st.session_state.farm_df["status"] != "Growing"].index,
+                                    axis=0, inplace=True)
+
     # Choose random market prices for each plant based on binomial distribution
     for plant in PLANTS:
         st.session_state.market_prices[plant] = np.random.binomial(1, 0.5, 1)[0] * (
@@ -112,7 +118,10 @@ def simulate_month():
     # Calculate the monthly costs
     month_cost, rent_cost, seeds_cost, elec_cost, water_cost, nutrients_cost = calculate_month_cost()
 
-    # Calculate revenue
+    # Increment the age of all plants by one month
+    st.session_state.farm_df.loc[:, "age"] += 30
+
+    # Simulate plant growth and disturbances
     for idx, row in st.session_state.farm_df.iterrows():
         if row["status"] == "Growing":
             plant = PLANTS[row["plant"]]
@@ -120,14 +129,14 @@ def simulate_month():
             dead, adverse_variables = simulate_disturbance(plant, env)
             if dead:
                 reasons = [_to_human_readable(x) for x in adverse_variables]
-                updates.append((idx, f"Dead - Unbalanced {_format_list(reasons)}", 0, 0))
+                updates.append((idx, f"Dead - Unbalanced {_format_list(reasons)}", 0.0, 0))
             elif row["age"] >= plant["growth_days"]:
                 yield_kg = get_plant_yield(plant, row["health"])
-                revenue = round(yield_kg * st.session_state.market_prices[row["plant"]], 2)
-                updates.append((idx, "Harvested", row["health"], revenue))
+                st.session_state.harvest_store[row["plant"]] += yield_kg
+                updates.append((idx, "Harvested", row["health"], 0))
             else:
                 health_score = plant_health_score(plant, env)
-                updates.append((idx, "Growing", health_score * row["health"], 0))
+                updates.append((idx, "Growing", round(health_score * row["health"], 2), 0))
 
     st.session_state.budget -= month_cost
 
@@ -142,7 +151,30 @@ def simulate_month():
     st.session_state.monthly_costs[st.session_state.month] = {"rent": rent_cost, "seeds": seeds_cost,
         "electricity": elec_cost, "water": water_cost, "nutrients": nutrients_cost, 'overall': month_cost}
 
-    # Increment the month and age of surviving plants
+    # Increment the month
     st.session_state.month += 1
-    st.session_state.farm_df.loc[st.session_state.farm_df["status"] == "Growing", "age"] += 30
     return
+
+
+def generate_market_day_customers():
+    # Generate customers and their demands based on market demand
+    customers = []
+    for i in range(10):
+        customer = {
+            "id": i + 1,
+            "demand": {},
+            "min_price": 0,
+            "max_price": 0,
+            "accepted": False
+        }
+        for item, price in st.session_state.market_prices.items():
+            if np.random.rand() < 0.5:
+                qty = random.randint(1, 5)
+                customer["demand"][item] = qty
+        if customer["demand"]:
+            customer["min_price"] = min(
+                price for item, price in st.session_state.market_prices.items() if item in customer["demand"])
+            customer["max_price"] = max(
+                price for item, price in st.session_state.market_prices.items() if item in customer["demand"])
+            customers.append(customer)
+    st.session_state.customers = customers
