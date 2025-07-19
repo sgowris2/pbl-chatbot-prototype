@@ -9,7 +9,7 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from vertical_farm.data import PLANTS, ITEM_ICONS
-from vertical_farm.simulator import simulate_month, STARTING_BUDGET, PRICES, LEVELS, LEVEL_AREA, INPUT_LEVELS, level_inputs, env_inputs, generate_market_day_customers
+from vertical_farm.simulator import simulate_month, STARTING_BUDGET, LEVELS, LEVEL_AREA, INPUT_VARS_VALUES_LIST, STARTING_LEVEL_INPUTS, STARTING_ENV_INPUTS, generate_market_day_customers
 from vertical_farm.ui_callbacks import _update_monthly_changes, _disable_simulate, _check_justifications
 
 
@@ -23,15 +23,15 @@ def initialize_session_state():
         st.session_state.farm_df = pd.DataFrame(columns=[
             "level", "plant", "day_planted", "age", "space", "status", "health"
         ])
-        st.session_state.env_inputs = env_inputs
-        st.session_state.level_inputs = level_inputs
-        st.session_state.market_prices = PRICES
+        st.session_state.STARTING_ENV_INPUTS = STARTING_ENV_INPUTS
+        st.session_state.STARTING_LEVEL_INPUTS = STARTING_LEVEL_INPUTS
+        st.session_state.market_prices = dict()
         st.session_state.monthly_logs = {}
         st.session_state.month_start_state = \
             {
                 'farm_df': st.session_state.farm_df.__deepcopy__(),
-                'levels': level_inputs.copy(),
-                'env': env_inputs.copy()
+                'levels': STARTING_LEVEL_INPUTS.copy(),
+                'env': STARTING_ENV_INPUTS.copy()
             }
         st.session_state.month_changes = {
             x:{
@@ -51,6 +51,7 @@ def initialize_session_state():
             "accepted": False
         }]
         st.session_state.current_customer = 0
+        st.session_state.enough = True
         st.session_state.customer_offer_submitted = False
         st.session_state.revenue = 0
         st.session_state.results = []
@@ -64,9 +65,6 @@ def sidebar():
     st.sidebar.markdown("###")
     with st.sidebar:
         performance_panel()
-    with st.sidebar:
-        with st.expander("₹ Market Prices"):
-            st.table(pd.DataFrame.from_dict(st.session_state.market_prices, orient="index", columns=["₹/kg"]))
 
     if st.sidebar.button('ⓘ Factsheet', key="factsheet_button"):
         fact_sheet()
@@ -114,8 +112,7 @@ def market_day_screen():
         st.rerun()
 
     customer = st.session_state.customers[idx]
-    customer_icon = random.choice(["👩", "👨", "👵", "👴", "👩‍🌾", "👨‍🌾", "👩‍🍳", "👨‍🍳", "👩‍💼",
-                                    "👨‍💼", "👩‍🎓", "👨‍🎓", "👩‍🔧", "👨‍🔧", "👩‍💻", "👨‍💻"])
+
     st.header(f"🧺 Market Day #{st.session_state.month + 1}")
     st.markdown("Welcome to the market day! You will meet 10 customers today. "
                 "Each customer has specific demands and a maximum price they are willing to pay. "
@@ -128,7 +125,7 @@ def market_day_screen():
             item_icon = ITEM_ICONS.get(item, "📦")  # Default icon if not found
             st.write(f"{item} {item_icon}  :  {qty}kg")
     st.markdown("---")
-    st.markdown(f"### {customer_icon} Customer {idx + 1} of 10")
+    st.markdown(f"### {customer['icon']} Customer {idx + 1} of 10")
     st.write("#### Asking for:\n")
     for item, qty in customer["demand"].items():
         if qty > 0:
@@ -141,42 +138,39 @@ def market_day_screen():
     with col1:
         offer = st.number_input("Enter your total offer price (₹)", min_value=0, key=f"offer_{idx}",
                                 disabled=st.session_state.customer_offer_submitted)
-        enough = True
 
     with col2:
         if st.button("➤ Submit Offer", key=f"submit_{idx}", disabled=st.session_state.customer_offer_submitted):
-            enough = all(
+            customer['accepted'] = False
+            st.session_state.enough = all(
                 st.session_state.harvest_store.get(item, 0) >= qty
                 for item, qty in customer["demand"].items()
             )
-            if not enough:
-                st.error("❌ Not enough inventory.")
-            else:
+            if st.session_state.enough:
                 accepted = offer <= customer["max_price"]
                 if accepted:
-                    st.success("✅ Accepted!")
                     st.session_state.revenue += offer
                     customer['accepted'] = True
                     for item, qty in customer["demand"].items():
                         st.session_state.harvest_store[item] -= qty
-                else:
-                    st.warning("❌ Rejected.")
 
-                st.session_state.results.append({
-                    "customer": idx + 1,
-                    "accepted": accepted,
-                    "price": offer
-                })
-                st.session_state.customer_offer_submitted = True
-                st.rerun()
+            st.session_state.results.append({
+                "customer": idx + 1,
+                "accepted": customer["accepted"],
+                "price": offer
+            })
+
+            st.session_state.customer_offer_submitted = True
+            st.rerun()
 
     if st.session_state.customer_offer_submitted:
-        if customer['accepted']:
-            st.success("✅ Offer Accepted!")
-        elif not enough:
+        if not st.session_state.enough:
             st.error("❌ Not enough inventory.")
-        elif not customer['accepted']:
-            st.warning("❌ Offer Rejected.")
+        else:
+            if customer['accepted']:
+                st.success("✅ Offer Accepted!")
+            else:
+                st.warning("❌ Offer Rejected.")
     else:
         st.info("Submit an offer or skip this customer.")
 
@@ -274,9 +268,9 @@ def control_panel():
             st.markdown(f"###### **Used / Total Space:** {used_area:.2f} / {LEVEL_AREA} m²")
             lighting, water, nutrients = level_inputs_controls(level)
             plant_seeds_form(level, used_area)
-            env_inputs["T"] = temperature
-            env_inputs["H"] = humidity
-            level_inputs[level] = {
+            STARTING_ENV_INPUTS["T"] = temperature
+            STARTING_ENV_INPUTS["H"] = humidity
+            STARTING_LEVEL_INPUTS[level] = {
                 "L": lighting,
                 "W": water,
                 "N": nutrients,
@@ -322,9 +316,9 @@ def env_controls():
             with col2:
                 temperature = st.select_slider(
                     "temperature",
-                    options=INPUT_LEVELS["T"],
+                    options=INPUT_VARS_VALUES_LIST["T"],
                     key=f"T",
-                    value=st.session_state.T if 'T' in st.session_state else st.session_state.env_inputs["T"],
+                    value=st.session_state.T if 'T' in st.session_state else st.session_state.STARTING_ENV_INPUTS["T"],
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'environment', 'var': 'T', 'key': 'T'}
@@ -336,9 +330,9 @@ def env_controls():
             with col2:
                 humidity = st.select_slider(
                     "water",
-                    options=INPUT_LEVELS["H"],
+                    options=INPUT_VARS_VALUES_LIST["H"],
                     key=f"H",
-                    value=st.session_state.H if 'H' in st.session_state else st.session_state.env_inputs["H"],
+                    value=st.session_state.H if 'H' in st.session_state else st.session_state.STARTING_ENV_INPUTS["H"],
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'environment', 'var': 'H', 'key': 'H'}
@@ -356,9 +350,9 @@ def level_inputs_controls(level):
             with col2:
                 lighting = st.select_slider(
                     "lighting",
-                    options=INPUT_LEVELS["L"],
+                    options=INPUT_VARS_VALUES_LIST["L"],
                     key=f"L_{level}",
-                    value=st.session_state.get(f"L_{level}", st.session_state.level_inputs[level]["L"]),
+                    value=st.session_state.get(f"L_{level}", st.session_state.STARTING_LEVEL_INPUTS[level]["L"]),
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'inputs', 'level': level, 'var': 'L', 'key': f'L_{level}'}
@@ -370,9 +364,9 @@ def level_inputs_controls(level):
             with col2:
                 water = st.select_slider(
                     "water",
-                    options=INPUT_LEVELS["W"],
+                    options=INPUT_VARS_VALUES_LIST["W"],
                     key=f"W_{level}",
-                    value=st.session_state.get(f"W_{level}", st.session_state.level_inputs[level]["W"]),
+                    value=st.session_state.get(f"W_{level}", st.session_state.STARTING_LEVEL_INPUTS[level]["W"]),
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'inputs', 'level': level, 'var': 'W', 'key': f'W_{level}'}
@@ -384,9 +378,9 @@ def level_inputs_controls(level):
             with col2:
                 nutrients = st.select_slider(
                     "nutrients",
-                    options=INPUT_LEVELS["N"],
+                    options=INPUT_VARS_VALUES_LIST["N"],
                     key=f"N_{level}",
-                    value=st.session_state.get(f"N_{level}", st.session_state.level_inputs[level]["N"]),
+                    value=st.session_state.get(f"N_{level}", st.session_state.STARTING_LEVEL_INPUTS[level]["N"]),
                     label_visibility='collapsed',
                     on_change=_update_monthly_changes,
                     kwargs={'type': 'inputs', 'level': level, 'var': 'N', 'key': f'N_{level}'}
@@ -510,8 +504,8 @@ def main():
             st.session_state["_just_simulated"] = True
             st.session_state.month_start_state = {
                 'farm_df': st.session_state.farm_df.__deepcopy__(),
-                'env': st.session_state.env_inputs.copy(),
-                'levels': st.session_state.level_inputs.copy(),
+                'env': st.session_state.STARTING_ENV_INPUTS.copy(),
+                'levels': st.session_state.STARTING_LEVEL_INPUTS.copy(),
             }
             st.session_state.screen = "market"
             generate_market_day_customers()

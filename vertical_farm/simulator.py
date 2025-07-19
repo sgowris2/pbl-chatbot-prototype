@@ -3,19 +3,35 @@ import random
 import numpy as np
 import streamlit as st
 
-from vertical_farm.data import PLANTS
+from vertical_farm.data import PLANTS, MARKET_DEMAND_RATIOS
 
 STARTING_BUDGET = 10000.0  # Starting budget in Rs.
-PRICES = {"Tomato": 30, "Lettuce": 60}
 LEVELS = ["Level 1", "Level 2", "Level 3"]
-LEVEL_AREA = 25.0  # m^2 per level
+LEVEL_AREA = 10.0  # m^2 per level
+FARM_AREA = LEVEL_AREA * len(LEVELS)  # Total farm area in m^2
 INPUT_VARS = ["N", "W", "L", "T", "H"]  # Nutrients, Water, Light, Temperature, Humidity
-INPUT_LEVELS = {"N": [x for x in range(0, 51)], "W": [x for x in range(0, 1001, 10)], "L": [x for x in range(0, 31)],
-    "T": [x for x in range(10, 46)], "H": [x for x in range(0, 101, 5)]}
-RENT = LEVEL_AREA * 100
-
-env_inputs = {"T": 24, "H": 50.0}
-level_inputs = {x: {k: v[0] for k, v in INPUT_LEVELS.items()} for x in LEVELS}
+INPUT_VARS_VALUES_LIST = {
+    "N": [x for x in range(0, 51)],
+    "W": [x for x in range(0, 1001, 10)],
+    "L": [x for x in range(0, 31)],
+    "T": [x for x in range(10, 46)],
+    "H": [x for x in range(0, 101, 5)]
+}
+STARTING_ENV_INPUTS = {"T": 24, "H": 50.0}
+STARTING_LEVEL_INPUTS = {x: {k: v[0] for k, v in INPUT_VARS_VALUES_LIST.items()} for x in LEVELS}
+# ---
+AMBIENT_TEMP = 24  # Ambient temperature in degC
+AMBIENT_HUMIDITY = 50.0  # Ambient humidity in %
+RENT = LEVEL_AREA * 100 # Rs. 100 per month per m^2
+PRICE_L_PER_DLI_PER_M2_PER_MONTH = 0.0648 * 2.00  # Rs. 2 per KWh and Rs. 0.0648 KWh / DLI / m^2 / month
+PRICE_T_PER_DEG_C_PER_M2_PER_MONTH = 1.00  # Rs. 1 per degC / m^2 / month
+PRICE_H_PER_PERCENT_RH_PER_M2_PER_MONTH = 1.00  # Rs. 1 per %RH / m^2 / month
+PRICE_W_PER_ML_PER_DAY_PER_M2_PER_MONTH = 0.0015 # Rs. 0.0015 per mL/day / m^2 / month
+PRICE_N_PER_G_PER_DAY_PER_M2_PER_MONTH = 5.00  # Rs. 5 per g/day / m^2 / month
+# ---
+NO_OF_CUSTOMERS = 10
+MARKET_DEMAND_BASELINE = {plant: FARM_AREA * ratio * PLANTS[plant]['Gmax'] / PLANTS[plant]['space_required'] for plant, ratio in MARKET_DEMAND_RATIOS.items()}
+MARKET_DEMAND_RANGES = {plant: (MARKET_DEMAND_BASELINE[plant], MARKET_DEMAND_BASELINE[plant] * 4) for plant, ratio in MARKET_DEMAND_RATIOS.items()}
 
 
 def _to_human_readable(var):
@@ -55,7 +71,7 @@ def plant_health_score(plant, env):
 
 
 def get_plant_yield(plant, health_score):
-    return round(plant["Gmax"] * health_score, 0)
+    return round(plant["Gmax"] * health_score, 1)
 
 
 def simulate_disturbance(plant, env):
@@ -89,13 +105,12 @@ def calculate_month_cost():
             plant_info = PLANTS[plant]
             seed_costs += plant_info["seed_cost"] * new_plants[plant]
     for level in LEVELS:
-        env = level_inputs[level]
-        elec_costs += round(0.0648 * LEVEL_AREA * 2 * env['L'])  # 0.0648 KWh / DLI / m^2 / month * Rs.2 per KWh
-        elec_costs += round(1.00 * LEVEL_AREA * abs(env['T'] - 25))  # 1 Rs. / C / m^2 / month
-        elec_costs += round(1.00 * LEVEL_AREA * abs(env['H'] - 30))  # 1 Rs. / %RH / m^2 / month
-        elec_costs += round(1.00 * LEVEL_AREA * env['W'] / 1000.0)  # 1 Rs. / L / m^2 / month
-        water_costs += round(1.50 * LEVEL_AREA * env['W'] / 1000.0)
-        nutrients_costs += round(5.00 * LEVEL_AREA * env['N'])  # 0.05 Rs. / N / m^2 / month
+        env = STARTING_LEVEL_INPUTS[level]
+        elec_costs += round(PRICE_L_PER_DLI_PER_M2_PER_MONTH * LEVEL_AREA * env['L'])  # 0.0648 KWh / DLI / m^2 / month * Rs.2 per KWh
+        elec_costs += round(PRICE_T_PER_DEG_C_PER_M2_PER_MONTH * LEVEL_AREA * abs(env['T'] - AMBIENT_TEMP))  # 1 Rs. / degC / m^2 / month
+        elec_costs += round(PRICE_H_PER_PERCENT_RH_PER_M2_PER_MONTH * LEVEL_AREA * abs(env['H'] - AMBIENT_HUMIDITY))  # 1 Rs. / %RH / m^2 / month
+        water_costs += round(PRICE_W_PER_ML_PER_DAY_PER_M2_PER_MONTH * LEVEL_AREA * env['W']) # 1.50 Rs. / L/day / m^2 / month
+        nutrients_costs += round(PRICE_N_PER_G_PER_DAY_PER_M2_PER_MONTH * LEVEL_AREA * env['N'])  # 5 Rs. / g/day / m^2 / month
 
     month_cost = round(rent_costs + seed_costs + elec_costs + water_costs + nutrients_costs, 2)
 
@@ -125,7 +140,7 @@ def simulate_month():
     for idx, row in st.session_state.farm_df.iterrows():
         if row["status"] == "Growing":
             plant = PLANTS[row["plant"]]
-            env = level_inputs[row["level"]].copy()
+            env = STARTING_LEVEL_INPUTS[row["level"]].copy()
             dead, adverse_variables = simulate_disturbance(plant, env)
             if dead:
                 reasons = [_to_human_readable(x) for x in adverse_variables]
@@ -137,6 +152,9 @@ def simulate_month():
             else:
                 health_score = plant_health_score(plant, env)
                 updates.append((idx, "Growing", round(health_score * row["health"], 2), 0))
+
+    for k, v in st.session_state.harvest_store.items():
+        st.session_state.harvest_store[k] = round(v, 0)
 
     st.session_state.budget -= month_cost
 
@@ -157,24 +175,37 @@ def simulate_month():
 
 
 def generate_market_day_customers():
-    # Generate customers and their demands based on market demand
+
+    def split_number_into_chunks(total, chunks=10):
+        cuts = sorted(random.sample(range(1, total), chunks - 1))
+        cuts = [0] + cuts + [total]
+        return [cuts[i + 1] - cuts[i] for i in range(chunks)]
+
+    market_demand = {}
+    demand_of_each_customer = {}
+    for item in MARKET_DEMAND_RANGES:
+        market_demand[item] = int(np.random.uniform(low=MARKET_DEMAND_RANGES[item][0], high=MARKET_DEMAND_RANGES[item][1]))
+        demand_of_each_customer[item] = split_number_into_chunks(market_demand[item], NO_OF_CUSTOMERS)
+
     customers = []
-    for i in range(10):
+    for i in range(NO_OF_CUSTOMERS):
+        customer_icon = random.choice(["👩", "👨", "👵", "👴", "👩‍🌾", "👨‍🌾", "👩‍🍳", "👨‍🍳", "👩‍💼",
+                                       "👨‍💼", "👩‍🎓", "👨‍🎓", "👩‍🔧", "👨‍🔧", "👩‍💻", "👨‍💻"])
         customer = {
             "id": i + 1,
-            "demand": {},
-            "min_price": 0,
+            "icon": customer_icon,
+            "demand": {item: values[i] for item, values in demand_of_each_customer.items()},
             "max_price": 0,
             "accepted": False
         }
+
         for item, price in st.session_state.market_prices.items():
             if np.random.rand() < 0.5:
-                qty = random.randint(1, 5)
-                customer["demand"][item] = qty
-        if customer["demand"]:
-            customer["min_price"] = min(
-                price for item, price in st.session_state.market_prices.items() if item in customer["demand"])
-            customer["max_price"] = max(
-                price for item, price in st.session_state.market_prices.items() if item in customer["demand"])
-            customers.append(customer)
+                customer["demand"][item] = demand_of_each_customer[item][i]
+
+        for item in customer['demand']:
+            customer["max_price"] += customer["demand"][item] * st.session_state.market_prices[item]
+
+        customers.append(customer)
+
     st.session_state.customers = customers
