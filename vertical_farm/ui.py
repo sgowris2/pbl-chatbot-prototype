@@ -5,6 +5,7 @@ import uuid
 
 import pandas as pd
 import streamlit as st
+from anyio import create_udp_socket
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -53,6 +54,7 @@ def initialize_session_state():
         st.session_state.current_customer = 0
         st.session_state.enough = True
         st.session_state.customer_offer_submitted = False
+        st.session_state.customer_offer_result = None
         st.session_state.revenue = 0
         st.session_state.results = []
 
@@ -106,31 +108,32 @@ def fact_sheet():
 
 def market_day_screen():
 
+    no_of_customers = len(st.session_state.customers)
     idx = st.session_state.current_customer
-    if idx >= 10:
+    if idx >= no_of_customers:
         st.session_state.screen = "summary"
         st.rerun()
 
     customer = st.session_state.customers[idx]
+    customer_item = customer["demand"][0]
+    customer_qty = customer["demand"][1]
 
     st.header(f"🧺 Market Day #{st.session_state.month + 1}")
-    st.markdown("Welcome to the market day! You will meet 10 customers today. "
+    st.markdown("Welcome to the market day! You will meet several customers today. "
                 "Each customer has specific demands and a maximum price they are willing to pay. "
                 "Your goal is to sell your produce at fair prices. "
                 "Remember that customers only listen to one offer.")
     st.markdown('')
     with st.container(border=1):
         st.write(f"**Your Produce**:")
-        for item, qty in st.session_state.harvest_store.items():
-            item_icon = ITEM_ICONS.get(item, "📦")  # Default icon if not found
-            st.write(f"{item} {item_icon}  :  {qty}kg")
+        for store_item, store_qty in st.session_state.harvest_store.items():
+            item_icon = ITEM_ICONS.get(store_item, "📦")  # Default icon if not found
+            st.write(f"{store_item} {item_icon}  :  {store_qty}kg")
     st.markdown("---")
-    st.markdown(f"### {customer['icon']} Customer {idx + 1} of 10")
+    st.markdown(f"### {customer['icon']} Customer {idx + 1} of {no_of_customers}")
     st.write("#### Asking for:\n")
-    for item, qty in customer["demand"].items():
-        if qty > 0:
-            item_icon = ITEM_ICONS.get(item, "📦")  # Default icon if not found
-            st.write(f"{item} {item_icon}  :  {qty}kg")
+    item_icon = ITEM_ICONS.get(customer_item, "📦")  # Default icon if not found
+    st.write(f"{customer_item} {item_icon}  :  {customer_qty}kg")
     st.markdown('')
 
     col1, col2 = st.columns([2, 1], gap='small', vertical_alignment='bottom')
@@ -142,23 +145,18 @@ def market_day_screen():
     with col2:
         if st.button("➤ Submit Offer", key=f"submit_{idx}", disabled=st.session_state.customer_offer_submitted):
             customer['accepted'] = False
-            st.session_state.enough = all(
-                st.session_state.harvest_store.get(item, 0) >= qty
-                for item, qty in customer["demand"].items()
-            )
+            st.session_state.enough = st.session_state.harvest_store.get(customer_item, 0) >= customer_qty
             if st.session_state.enough:
                 accepted = offer <= customer["max_price"]
                 if accepted:
+                    st.session_state.customer_offer_result = "accepted"
                     st.session_state.revenue += offer
                     customer['accepted'] = True
-                    for item, qty in customer["demand"].items():
-                        st.session_state.harvest_store[item] -= qty
-
-            st.session_state.results.append({
-                "customer": idx + 1,
-                "accepted": customer["accepted"],
-                "price": offer
-            })
+                    st.session_state.harvest_store[customer_item] -= customer_qty
+                else:
+                    st.session_state.customer_offer_result = "rejected"
+            else:
+                st.session_state.customer_offer_result = "skipped"
 
             st.session_state.customer_offer_submitted = True
             st.rerun()
@@ -177,12 +175,16 @@ def market_day_screen():
     st.markdown('')
     if st.button(f"{'⏩ Next' if st.session_state.customer_offer_submitted else '❌ Skip'} Customer", key=f"skip_customer"):
         st.session_state.results.append({
-            "customer": idx + 1,
-            "accepted": False,
-            "price": 0
+            "customer": idx,
+            "item": customer_item,
+            "qty": customer_qty,
+            "offer_result": st.session_state.customer_offer_result if st.session_state.customer_offer_result else "skipped",
+            "offer_price": offer if offer else None,
+            "customer_max_price": customer["max_price"]
         })
         st.session_state.current_customer += 1
         st.session_state.customer_offer_submitted = False
+        st.session_state.customer_offer_result = None
         st.rerun()
 
 
@@ -199,11 +201,15 @@ def summary_screen():
     st.markdown('')
     st.write("**Results:**")
     for res in st.session_state.results:
-        status = "✅ Accepted" if res["accepted"] else "❌ Rejected"
-        if status == "✅ Accepted":
-            st.success(f"Customer {res['customer']}: ₹{res['price']} — {status}")
+        if res["offer_result"] == "accepted":
+            status = "✅ Accepted"
+            st.success(f"Customer {res['customer'] + 1} wanted {res['qty']}kg {res['item']} @ ₹{res['customer_max_price']}  --  {status} at ₹{res['offer_price']}")
+        elif res["offer_result"] == "rejected":
+            status = "❌ Rejected"
+            st.error(f"Customer {res['customer'] + 1} wanted {res['qty']}kg {res['item']} @ ₹{res['customer_max_price']}  --  {status} at ₹{res['offer_price']}")
         else:
-            st.warning(f"Customer {res['customer']}: ₹{res['price']} — {status}")
+            status = "🙅🏻‍♂️ Skipped"
+            st.warning(f"Customer {res['customer'] + 1} wanted {res['qty']}kg {res['item']} @ ₹{res['customer_max_price']}  --  {status}")
 
     st.write("**Wasted Produce:**")
     for item, qty in st.session_state.harvest_store.items():
