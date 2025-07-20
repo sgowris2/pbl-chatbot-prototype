@@ -23,8 +23,8 @@ mushroom = {
     "Gmax": 0.030,    # Maximum yield - kg per plant
     "growth_days": 29,
     "space_required": 0.003, # m^2 per plant
-    "ideal": {"N": 3, "W": 1500, "L": 2, "T": 24, "H": 90},
-    "tolerance": {"N": 1, "W": 500, "L": 2, "T": 10, "H": 10},
+    "ideal": {"N": 3, "W": 1500, "L": 2, "T": 22, "H": 80},
+    "tolerance": {"N": 1, "W": 500, "L": 2, "T": 10, "H": 20},
     "seed_cost": 0.1,
     "supply_chain_cost_per_kg": 30
 }

@@ -7,7 +7,7 @@
     margin: 0em 0;
 }
 
-.st-key-simulate_next_month > div > button, .st-key-simulate_complete > div > button {
+.st-key-simulate_next_month > div > button, .st-key-simulate_complete > div > button, .st-key-market_button > div > button {
     height: 50px;
     padding: 0 1em;
     font-size: 2em;
@@ -21,15 +21,15 @@
     margin: 0 auto;
     display: block;
 }
-.st-key-simulate_next_month > div > button:hover, .st-key-simulate_complete > div > button:hover {
+.st-key-simulate_next_month > div > button:hover, .st-key-simulate_complete > div > button:hover, .st-key-market_button > div > button:hover {
     background-color: #388e3c;
     color: white;
 }
-.st-key-simulate_next_month > div > button:active, .st-key-simulate_complete > div > button:active,
- .st-key-simulate_next_month > div > button:focus, .st-key-simulate_complete > div > button:focus {
+.st-key-simulate_next_month > div > button:active, .st-key-simulate_complete > div > button:active, .st-key-market_button > div > button: active
+ .st-key-simulate_next_month > div > button:focus, .st-key-simulate_complete > div > button:focus, .st-key-market_button > div > button: focus {
     color: white !important;
 }
-.st-key-simulate_next_month > div > button:disabled, .st-key-simulate_complete > div > button:disabled {
+.st-key-simulate_next_month > div > button:disabled, .st-key-simulate_complete > div > button:disabled, .st-key-market_button > div > button: disabled {
     background-color: #9e9e9e;
     color: white;
     cursor: not-allowed;

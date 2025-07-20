@@ -11,11 +11,11 @@ LEVEL_AREA = 10.0  # m^2 per level
 FARM_AREA = LEVEL_AREA * len(LEVELS)  # Total farm area in m^2
 INPUT_VARS = ["N", "W", "L", "T", "H"]  # Nutrients, Water, Light, Temperature, Humidity
 INPUT_VARS_VALUES_LIST = {
-    "N": [x for x in range(0, 51)],
-    "W": [x for x in range(0, 1001, 10)],
+    "N": [x for x in range(0, 11)],
+    "W": [x for x in range(0, 5001, 500)],
     "L": [x for x in range(0, 31)],
-    "T": [x for x in range(10, 46)],
-    "H": [x for x in range(0, 101, 5)]
+    "T": [x for x in range(15, 36)],
+    "H": [x for x in range(0, 101, 10)]
 }
 STARTING_ENV_INPUTS = {"T": 24, "H": 50.0}
 STARTING_LEVEL_INPUTS = {x: {k: v[0] for k, v in INPUT_VARS_VALUES_LIST.items()} for x in LEVELS}
@@ -70,7 +70,7 @@ def plant_health_score(plant, env):
 
 
 def get_plant_yield(plant, health_score):
-    return round(plant["Gmax"] * health_score, 1)
+    return round(plant["Gmax"] * health_score, 4)
 
 
 def simulate_disturbance(plant, env):
@@ -126,7 +126,6 @@ def simulate_month():
 
     # Generate market prices for all plants
     generate_market_prices()
-    print(st.session_state.market_prices)
 
     # Calculate the monthly costs
     month_cost, rent_cost, seeds_cost, elec_cost, water_cost, nutrients_cost = calculate_month_cost()
@@ -184,7 +183,7 @@ def generate_market_prices():
             plant['growth_days'] / 30, 0)
         total_cost_per_m2 = elec_cost_per_m2 + water_cost_per_m2 + nutrients_cost_per_m2
         total_cost_per_kg = round((total_cost_per_m2 / yield_per_m2) + plant['supply_chain_cost_per_kg'], 0)
-        st.session_state.market_prices[name] = round(total_cost_per_kg * 1.1, 0)
+        st.session_state.market_prices[name] = round(total_cost_per_kg * 1.4, 0)
 
 
 def generate_market_day_customers():
@@ -217,4 +216,5 @@ def generate_market_day_customers():
             }
             customers.append(customer)
 
+    random.shuffle(customers)
     st.session_state.customers = customers
